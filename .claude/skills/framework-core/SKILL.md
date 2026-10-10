@@ -75,7 +75,8 @@ Layers, later wins: `config/application.yml` → `config/application-ci.yml` (`C
 - The standard set (`autotests.elements`, proven on every widget variant of the qa-playground
   `/widgets` gallery in Chrome and Firefox, 2026-10-11): `Button`, `Input`, `CheckBox`,
   `RadioGroup`, `FileUpload`, `Calendar`, `SelectDropdown`, `ListDropdown`, `AriaDropdown`,
-  `MultiSelectDropdown`, `ReactSelectDropdown` (one `Dropdown` protocol), `Table`, `Modal`,
+  `MultiSelectDropdown`, `ReactSelectDropdown`, `Select2Dropdown` (declared on the hidden `<select>`;
+  ⚠ proven on one app) (one `Dropdown` protocol), `Table`, `Modal`,
   `Toasts`, `Tabs`, `Menu`, `Pagination`. By ARIA roles and common markup, so they fit most apps.
 - **No new element classes unless the user asks** — a widget none fits: a subclass overriding its
   CSS hooks (`ListDropdown.toggle_css`), or stop and ask. Screen-specific reading (a badge, a
@@ -83,6 +84,8 @@ Layers, later wins: `config/application.yml` → `config/application-ci.yml` (`C
 - React apps: `Input.type_kept` (a field drawn again while typed into), `Button.click_until(what,
   done)` (a click the app loses or a toast covers), `CheckBox` clicks a 0 px box's label or cell.
   A fix the elements lack, seen in a second page, goes into the element — not a loop per page.
+- Passwords: `Input.type` / `clear_and_type` take a `SecretStr` and log `***` — pass the
+  credential's `SecretStr` as is, never `.get_secret_value()` (the log would hold it; lab9).
 - Text: `text_of(e)` / `element.text()` = textContent with whitespace collapsed (&nbsp; too), not
   changed by CSS text-transform, also for hidden elements.
 - Name clashes: an element class's public names are its API (`Input.value()`); the base keeps its

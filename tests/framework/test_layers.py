@@ -80,12 +80,13 @@ def test_placeholders_give_fresh_values() -> None:
 
 
 def test_variants_env_overrides_and_masked_secrets(tmp_path: Path) -> None:
-    (tmp_path / "data" / "dev").mkdir(parents=True)
+    env = load_settings(environ={}).env  # the project's default env — "dev" until it's renamed
+    (tmp_path / "data" / env).mkdir(parents=True)
     (tmp_path / "data" / "sample-data.json").write_text(
         json.dumps({"default": {"name": "{{firstname}}", "born": "{{yesterday:yyyy-MM-dd}}"}})
     )
     # an environment's file replaces the shared one whole — its own variants, all of them
-    (tmp_path / "data" / "dev" / "sample-data.json").write_text(
+    (tmp_path / "data" / env / "sample-data.json").write_text(
         json.dumps(
             {
                 "default": {"name": "Dev's own", "born": "2000-01-01"},

@@ -8,6 +8,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Self
 
+from pydantic import SecretStr
 from selenium.common.exceptions import (
     ElementClickInterceptedException,
     ElementNotInteractableException,
@@ -20,6 +21,14 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
 
 from autotests.elements.core import Element, log, text_of
+
+
+def _plain(text: str | SecretStr) -> str:
+    return text.get_secret_value() if isinstance(text, SecretStr) else text
+
+
+def _shown(text: str | SecretStr) -> str:
+    return "***" if isinstance(text, SecretStr) else text
 
 
 class Button(Element):
@@ -67,17 +76,17 @@ class Input(Element):
     """A text field: any input that takes typing, or a textarea. Its error is found through ARIA
     (aria-errormessage / aria-describedby), the way a screen reader finds it."""
 
-    def type(self, text: str) -> Self:
-        """Types after what's there already."""
-        log.info("[%s] type '%s'", self.label, text)
-        self.root.send_keys(text)
+    def type(self, text: str | SecretStr) -> Self:
+        """Types after what's there already. A `SecretStr` (a password) is logged as ***."""
+        log.info("[%s] type '%s'", self.label, _shown(text))
+        self.root.send_keys(_plain(text))
         return self
 
-    def clear_and_type(self, text: str) -> Self:
-        log.info("[%s] clear and type '%s'", self.label, text)
+    def clear_and_type(self, text: str | SecretStr) -> Self:
+        log.info("[%s] clear and type '%s'", self.label, _shown(text))
         root = self.root
         root.clear()
-        root.send_keys(text)
+        root.send_keys(_plain(text))
         return self
 
     def type_kept(self, text: str) -> Self:

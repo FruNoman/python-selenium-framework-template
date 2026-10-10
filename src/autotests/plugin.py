@@ -3,7 +3,7 @@
 Fixtures a test (or a page/data fixture in conftest.py) asks for:
   settings          the run's Settings (session)
   browser           one test's browser — a fresh one per test, quit after it — with settings, waits
-  user              who the test runs as (`@pytest.mark.as_user(User.ADMIN)`, default User.USER)
+  user              who the test runs as (`as_user(User.ADMIN)` mark; default: the first User)
   test_data_loader  JSON test data (session); data reaches tests through `data_fixture(...)`
   ui_texts          the app's fixed texts (session); per area through `texts_fixture(...)`
   created           what this test creates, deleted after it (cleanup handlers: `cleanup_handlers`)
@@ -95,12 +95,18 @@ def pytest_runtest_teardown(item: pytest.Item) -> None:
 
 @pytest.fixture
 def browser(
-    settings: Settings, user: User, authenticate: Callable[[Browser, User], None]
+    request: pytest.FixtureRequest,
+    settings: Settings,
+    user: User,
+    authenticate: Callable[[Browser, User], None],
 ) -> Iterator[Browser]:
     """A fresh browser for this test — no cookies, storage or windows from another test —
     logged in as `user` by `authenticate`, quit after the test."""
     driver = create_driver(settings)
     browser = Browser(driver, settings, Waits(driver, settings.waits.timeout, settings.waits.poll))
+    # for the failure artifacts: a page fixture failing in setup (its page never loaded) leaves
+    # item.funcargs without "browser" — it is filled only once every fixture succeeded (lab9)
+    request.node._autotests_browser = browser
     try:
         authenticate(browser, user)
         yield browser
@@ -111,7 +117,7 @@ def browser(
 @pytest.fixture
 def user(request: pytest.FixtureRequest) -> User:
     marker = request.node.get_closest_marker("as_user")
-    return marker.args[0] if marker else User.USER
+    return marker.args[0] if marker else next(iter(User))  # the least privileged
 
 
 @pytest.fixture
@@ -135,7 +141,7 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[Any]) -> 
     report: pytest.TestReport = outcome.get_result()
     failed = report.failed and report.when in ("setup", "call")
     expected_failure = report.when == "call" and hasattr(report, "wasxfail") and report.skipped
-    browser = item.funcargs.get("browser") if hasattr(item, "funcargs") else None
+    browser = getattr(item, "_autotests_browser", None)
     if (failed or expected_failure) and isinstance(browser, Browser):
         settings: Settings = item.config._autotests_settings  # type: ignore[attr-defined]
         folder = settings.path(settings.artifacts.dir) / artifacts.folder_name(item.nodeid)

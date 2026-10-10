@@ -9,6 +9,7 @@ from autotests.elements.dropdown import (
     ListDropdown,
     MultiSelectDropdown,
     ReactSelectDropdown,
+    Select2Dropdown,
     SelectDropdown,
 )
 
@@ -28,6 +29,7 @@ __all__ = [
     "Pagination",
     "RadioGroup",
     "ReactSelectDropdown",
+    "Select2Dropdown",
     "SelectDropdown",
     "Table",
     "Tabs",

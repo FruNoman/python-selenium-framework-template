@@ -131,6 +131,21 @@ class _Session:
     def delete(self, path: str, **kwargs: Any) -> ApiResponse:
         return self.request("DELETE", path, **kwargs)
 
+    def post_form(self, path: str, fields: list[tuple[str, str]]) -> ApiResponse:
+        """A server-rendered form submitted as the browser submits it (`api.forms`): urlencoded,
+        no XHR headers, the redirect returned as the answer. Only the field count is logged — a
+        form carries tokens and personal data."""
+        url = self.client.base_url + path.lstrip("/")
+        response = self.session.post(
+            url,
+            data=fields,
+            headers={"Accept": "text/html", "X-Requested-With": None},
+            allow_redirects=False,
+            timeout=self.client.timeout,
+        )
+        log.info("POST %s (form, %d fields) → %s", url, len(fields), response.status_code)
+        return ApiResponse(response)
+
 
 class WebClient:
     """Plain HTTP to the web app (a login form, a redirect check) — redirects are answers here."""

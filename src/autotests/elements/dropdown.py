@@ -419,3 +419,87 @@ class ReactSelectDropdown(Element):
 
     def _input(self) -> WebElement:
         return self.root.find_element(By.CSS_SELECTOR, self._input_css)
+
+
+class Select2Dropdown(AriaDropdown):
+    """select2 4.x (jQuery): declared on the hidden `<select>` it replaces (`By.ID, "dx_id"`). The
+    widget is the `span.select2` next to it — a `[role=combobox]` whose `aria-owns` names the
+    listbox (`ul#select2-<id>-results`, in <body>) while open; the search box is a separate
+    `.select2-search__field` in the open dropdown (hidden for short lists); the choice shows in
+    `#select2-<id>-container`. Every option is picked with a real click. Lightning Step, 2026-10-11.
+    """
+
+    _LISTBOX = (
+        "const input = arguments[0].nextElementSibling.querySelector('[role=combobox]');"
+        " const listbox = document.getElementById(input.getAttribute('aria-owns') ||"
+        " input.getAttribute('aria-controls')); const options = listbox ?"
+        " Array.from(listbox.querySelectorAll('[role=option]')) : [];"
+        " const label = o => o.textContent.trim();"
+    )
+    _SEARCH = (
+        ".select2-container--open .select2-search--dropdown:not(.select2-search--hide)"
+        " .select2-search__field"
+    )
+
+    def search(self, text: str) -> Self:
+        """Types into the open dropdown's search box; returns once the list is filtered for it."""
+        log.info("[%s] search '%s'", self.label, text)
+        self.open()
+        field = self.driver.find_element(By.CSS_SELECTOR, self._SEARCH)
+        field.clear()
+        field.send_keys(text)
+        self.waits.until(lambda _: self.results_shown_for(text), f"options of {self} for '{text}'")
+        return self
+
+    def select(self, text: str) -> Self:
+        """Picks the option labelled `text`: from the open list, searching first when it isn't
+        listed and the dropdown has a search box."""
+        self.open()
+        if text not in self.options() and self._has_search():
+            self.search(text)
+        option = self.js(
+            self._LISTBOX + " return options.find(o => label(o) === arguments[1]) || null", text
+        )
+        if option is None:
+            raise ValueError(f"No option '{text}' in {self}, listed: {self.options()[:20]}")
+        log.info("[%s] select '%s'", self.label, text)
+        option.click()
+        self._wait_chosen(text)
+        return self
+
+    def selected(self) -> str:
+        return self.js(
+            "const r = document.getElementById('select2-' + arguments[0].id + '-container');"
+            " return r ? (r.getAttribute('title') || r.textContent).trim() : ''",
+            self.root,
+        )
+
+    def choices(self) -> list[str]:
+        """Every option of the underlying <select>, open or not — e.g. to wait for a list the page
+        loads again after another field changed."""
+        return self.js(
+            "return Array.from(arguments[0].options).map(o => o.textContent.trim())", self.root
+        )
+
+    def close(self) -> Self:
+        if self.is_open():
+            self._input().send_keys(Keys.ESCAPE)
+            self.waits.until(lambda _: not self.is_open(), f"{self} closed")
+        return self
+
+    def results_shown_for(self, text: str) -> bool:
+        return bool(
+            self.js(
+                self._LISTBOX + " const field = document.querySelector(arguments[2]);"
+                " return !!field && field.value === arguments[1] && !!listbox &&"
+                " !listbox.querySelector('.loading-results')",
+                text,
+                self._SEARCH,
+            )
+        )
+
+    def _input(self) -> WebElement:
+        return self.root.find_element(By.XPATH, "following-sibling::span[1]//*[@role='combobox']")
+
+    def _has_search(self) -> bool:
+        return bool(self.driver.find_elements(By.CSS_SELECTOR, self._SEARCH))

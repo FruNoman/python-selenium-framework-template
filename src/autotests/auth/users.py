@@ -2,9 +2,9 @@
 (lower case: {"user": {"username": …, "password": …}}), another environment's in
 resources/data/<env>/user-data.json — never env vars, CI secrets or YAML; passwords never print.
 
-The default user is the least privileged one: a test needing more says `@pytest.mark.as_user(
-User.ADMIN)` — an admin sees everything, so a permission check missing in the app would pass
-unnoticed under one.
+The default user is the least privileged one — the first member of `User`: a test needing more
+says `@pytest.mark.as_user(User.ADMIN)` — an admin sees everything, so a permission check missing
+in the app would pass unnoticed under one.
 """
 
 from __future__ import annotations

@@ -31,11 +31,11 @@ for known bugs. The test-data JSON (placeholders, camelCase keys) reads the same
 
 | Module | What |
 |---|---|
-| `autotests/elements/` | The standard elements, by ARIA roles and common markup: `Button`, `Input`, `CheckBox`, `RadioGroup`, `FileUpload`, `Calendar`; `SelectDropdown` / `ListDropdown` / `AriaDropdown` (portal listboxes, async search) / `MultiSelectDropdown` / `ReactSelectDropdown` (one `Dropdown` protocol); `Table`, `Modal`, `Toasts`, `Tabs`, `Menu`, `Pagination`. Declared as class attributes of a page, found again on every use, every action logged. **Proven on every widget variant of the qa-playground `/widgets` gallery — 17 tests, Chrome and Firefox (2026-10-11).** |
+| `autotests/elements/` | The standard elements, by ARIA roles and common markup: `Button`, `Input`, `CheckBox`, `RadioGroup`, `FileUpload`, `Calendar`; `SelectDropdown` / `ListDropdown` / `AriaDropdown` (portal listboxes, async search) / `MultiSelectDropdown` / `ReactSelectDropdown` / `Select2Dropdown` (jQuery select2 4.x — ⚠ proven on one app, Lightning Step, 2026-10-11) (one `Dropdown` protocol); `Table`, `Modal`, `Toasts`, `Tabs`, `Menu`, `Pagination`. Declared as class attributes of a page, found again on every use, every action logged. **Proven on every widget variant of the qa-playground `/widgets` gallery — 17 tests, Chrome and Firefox (2026-10-11).** |
 | `autotests/pages/base_page.py` | `BasePage(browser)`: `path`, `is_loaded()`, `open()`, `get()`, `wait_loaded()`; the app's pages in `pages/<area>/` |
 | `autotests/support/` | `Waits` (explicit only: `until`, `for_new_document`, `for_change`), failure artifacts |
 | `autotests/data/` | `TestDataLoader` (JSON variants, per-env files, placeholders `{{uniqueTimestamp}}`, `{{inDays:3:yyyy-MM-dd}}`, Faker…), `TestData` models (pydantic), `data_fixture` / `texts_fixture` |
-| `autotests/api/` | `ApiClient` (requests, DTOs in and out, secrets masked in the log; ONBOARD: auth), `WebClient` (plain HTTP, redirects are answers) |
+| `autotests/api/` | `ApiClient` (requests, DTOs in and out, secrets masked in the log; ONBOARD: auth; `post_form` for server-rendered forms), `forms.py` (`form_fields(html, form_id)` — what a browser would post — + `with_values`), `WebClient` (plain HTTP, redirects are answers) |
 | `autotests/testdata/` | `TestDataRegistry` + `CleanupHandler`: what a test creates is deleted after it, also on failure; `sweep_stale` for killed runs |
 | `autotests/auth/` | `User` (least privileged first), `Credentials` (from `resources/data/user-data.json`) |
 | `autotests/plugin.py` | the pytest plugin: options, `settings`, `browser`, `user`, `authenticate`, data/texts/cleanup/api fixtures, logs per test, artifacts on failure and xfail |
@@ -54,6 +54,9 @@ Soft assertions: `with check: assert …, "what"` (pytest-check). Known product 
 Style: `ruff format` + `ruff check` (`make check`).
 
 ## Run
+
+PyCharm: interpreter `.venv/bin/python` (made by `uv sync`), `src` marked as Sources Root —
+otherwise every `autotests` import is red.
 
 ```bash
 uv sync                                             # once: Python 3.14 + pinned dependencies
