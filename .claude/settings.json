@@ -1,0 +1,24 @@
+{
+  "extraKnownMarketplaces": {
+    "qa-automation-toolkit": {
+      "source": {
+        "source": "github",
+        "repo": "FruNoman/qa-automation-toolkit"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "web-automation@qa-automation-toolkit": true
+  },
+  "permissions": {
+    "allow": [
+      "mcp__plugin_web-automation_selenium__*",
+      "Bash(uv run pytest:*)",
+      "Bash(uv run ruff:*)",
+      "Bash(uv sync:*)",
+      "Bash(make check:*)",
+      "Bash(make test:*)",
+      "Bash(./scripts/walk-session.sh:*)"
+    ]
+  }
+}
