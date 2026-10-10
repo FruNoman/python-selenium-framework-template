@@ -1,0 +1,11 @@
+build/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.env.local
+.claude/scratch/
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.idea/

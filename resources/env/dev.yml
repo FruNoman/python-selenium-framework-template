@@ -1,0 +1,11 @@
+# Test environment "dev": where the app under test lives — the default env.
+# ONBOARD: set the app's URL here (it points at Selenium's own test pages, used by the template's
+# example); add resources/env/<name>.yml per other environment (stage, …) with the same keys, select
+# with --env <name> / TEST_ENV=<name>. Create the new file before deleting this one if the app has
+# no "dev". URLs and non-secret per-env settings only — logins are test data (resources/data).
+base:
+  # root URL, trailing slash — every page's path is appended to it
+  url: https://www.selenium.dev/selenium/web/
+# Per-environment browser mode, when this environment needs other than the default:
+# browser:
+#   headless: false

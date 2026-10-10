@@ -1,0 +1,26 @@
+{
+  "default": {
+    "text": "{{text:8}}",
+    "textarea": "line one",
+    "option": "Two",
+    "optionValue": "2",
+    "missingOption": "Four",
+    "radio": "Default radio",
+    "radios": ["Checked radio", "Default radio"],
+    "file": "files/notes.txt",
+    "fileName": "notes.txt",
+    "message": "Received!"
+  },
+  "second-option": {
+    "text": "{{text:8}}",
+    "textarea": "line one",
+    "option": "Three",
+    "optionValue": "3",
+    "missingOption": "Four",
+    "radio": "Default radio",
+    "radios": ["Checked radio", "Default radio"],
+    "file": "files/notes.txt",
+    "fileName": "notes.txt",
+    "message": "Received!"
+  }
+}

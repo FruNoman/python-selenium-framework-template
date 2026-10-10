@@ -1,0 +1,24 @@
+# Defaults for every run. Layered, later wins:
+#   config/application.yml → config/application-ci.yml (CI=true) → resources/env/<env>.yml →
+#   environment variables (TEST_ENV, BASE_URL, RUNNER, BROWSER, HEADLESS, GRID_URL,
+#   WAITS_TIMEOUT) → pytest options (--env, --runner, --browser, --headed).
+env: dev            # which resources/env/<name>.yml — the app's deployment
+runner: local       # local (a browser on this machine) | grid (Selenium Grid, GRID_URL)
+browser:
+  name: chrome      # chrome | firefox
+  # headless or not is the same switch for local and Grid browsers; an env file may override it
+  # (a site whose bot wall stops headless browsers). Watch one test: --headed (and -n 0).
+  headless: true
+  window: [1440, 900]
+grid:
+  url: http://localhost:4444
+waits:
+  timeout: 10        # seconds an element, a page or a condition gets; the implicit wait is always 0
+  poll: 0.1
+  page_load: 30
+artifacts:
+  dir: build/reports/failures   # one folder per failed test: screenshot, page.html, console, info
+logs:
+  dir: build/logs               # run.log + one log per test (tests/<test>.log)
+data:
+  dir: resources/data           # test data; resources/data/<env>/ wins over it

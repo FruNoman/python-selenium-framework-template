@@ -1,0 +1,5 @@
+# CI (CI=true): slower shared machines — longer waits. Headless stays what application.yml and the
+# env file say.
+waits:
+  timeout: 20
+  page_load: 60
