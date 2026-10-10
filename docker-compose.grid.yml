@@ -1,0 +1,55 @@
+# A real Selenium Grid: a hub that routes sessions, and one node
+# container per browser that actually runs it. Unlike the single
+# selenium/standalone-chrome image used for a quick local check, this is
+# the shape a CI pipeline or a Kubernetes deployment scales out — add
+# more node services (or replicas of one) to add capacity.
+services:
+  selenium-hub:
+    image: selenium/hub:4.49.0-20260909
+    # Only the WebDriver endpoint is published; the event bus (4442/4443) stays
+    # inside the compose network. GRID_PORT when 4444 is taken by another
+    # project's Grid (pass the same GRID_URL to the tests); another project name:
+    # COMPOSE_PROJECT_NAME or -p.
+    ports:
+      - "${GRID_PORT:-4444}:4444"
+    # "healthy" = hub up AND nodes registered (ready: true) — what CI waits on.
+    # Versions pinned to match selenium in pyproject.toml; bump together.
+    healthcheck:
+      test: ["CMD", "/opt/bin/check-grid.sh", "--host", "0.0.0.0", "--port", "4444"]
+      interval: 5s
+      timeout: 10s
+      retries: 24
+
+  chrome:
+    image: selenium/node-chrome:4.49.0-20260909
+    shm_size: 2gb
+    depends_on:
+      - selenium-hub
+    environment:
+      - SE_EVENT_BUS_HOST=selenium-hub
+      - SE_EVENT_BUS_PUBLISH_PORT=4442
+      - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
+      # the URL clients reach the Grid at — it goes into a session's BiDi webSocketUrl
+      # (Firefox console in failure artifacts); without it the node hands out the hub's
+      # container IP, which nothing outside the compose network reaches. The CI-compose
+      # tests container and Jenkins reach this localhost through their forwarding
+      # (FORWARD_PORTS includes the Grid port).
+      - SE_NODE_GRID_URL=http://localhost:${GRID_PORT:-4444}
+      # Up to 10 browsers in this one node (TESTS_THREADS ≤ 10). Parallel Chrome
+      # sessions in one node take each other's window focus — a WebDriver click in one
+      # blurs the others' pages (qa-playground 2026-10-01); driver/factory.py turns
+      # on CDP focus emulation per session, so pages behave focused regardless.
+      - SE_NODE_MAX_SESSIONS=10
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+
+  firefox:
+    image: selenium/node-firefox:4.49.0-20260909
+    shm_size: 2gb
+    depends_on:
+      - selenium-hub
+    environment:
+      - SE_EVENT_BUS_HOST=selenium-hub
+      - SE_EVENT_BUS_PUBLISH_PORT=4442
+      - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
+      # the Grid URL clients reach (see the chrome node): Firefox's BiDi console log
+      - SE_NODE_GRID_URL=http://localhost:${GRID_PORT:-4444}

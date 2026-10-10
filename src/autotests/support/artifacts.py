@@ -41,7 +41,11 @@ def save(driver: WebDriver, folder: Path, nodeid: str, failure: str) -> Path:
 
 
 def _console(driver: WebDriver) -> str:
-    """Chrome's console (goog:loggingPrefs, local and Grid alike); other browsers: unavailable."""
+    """Chrome's console (goog:loggingPrefs), Firefox's from the BiDi log the driver factory keeps —
+    local and Grid alike."""
+    recorded = getattr(driver, "autotests_console", None)
+    if recorded is not None:
+        return "".join(f"{m}\n" for m in recorded) or "(empty)\n"
     try:
         entries = driver.execute("getLog", {"type": "browser"})["value"]
     except WebDriverException:

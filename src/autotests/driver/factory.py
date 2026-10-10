@@ -36,7 +36,23 @@ def _firefox_options(settings: Settings) -> webdriver.FirefoxOptions:
     width, height = settings.browser.window
     options.add_argument(f"--width={width}")
     options.add_argument(f"--height={height}")
+    # Firefox has no getLog: its console comes over WebDriver BiDi (webSocketUrl). On a Docker
+    # Grid the nodes need SE_NODE_GRID_URL set to the URL clients use (docker-compose.grid.yml),
+    # or the session's webSocketUrl points at the hub's container IP
+    options.enable_bidi = True
     return options
+
+
+def _record_console(driver: WebDriver) -> None:
+    """Firefox: the console messages of the session, kept for the failure artifacts."""
+    messages: list[str] = []
+    driver.autotests_console = messages  # type: ignore[attr-defined]
+    try:
+        driver.script.add_console_message_handler(
+            lambda m: messages.append(f"{getattr(m, 'level', '?')} {getattr(m, 'text', m)}")
+        )
+    except Exception as e:  # a Grid that hands out an unreachable webSocketUrl
+        log.warning("no BiDi console for this session: %s", e)
 
 
 def create_driver(settings: Settings) -> WebDriver:
@@ -62,6 +78,7 @@ def create_driver(settings: Settings) -> WebDriver:
     driver.set_page_load_timeout(settings.waits.page_load)
     if not chrome:
         driver.set_window_size(*settings.browser.window)
+        _record_console(driver)
     log.info(
         "browser %s %s on %s",
         settings.browser.name,
