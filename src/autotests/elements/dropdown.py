@@ -5,7 +5,10 @@ from __future__ import annotations
 
 from typing import Protocol, Self
 
-from selenium.common.exceptions import ElementClickInterceptedException
+from selenium.common.exceptions import (
+    ElementClickInterceptedException,
+    ElementNotInteractableException,
+)
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.remote.webdriver import WebDriver
@@ -384,27 +387,56 @@ class ReactSelectDropdown(Element):
     def is_open(self) -> bool:
         return self._input().get_dom_attribute("aria-expanded") == "true"
 
-    def search(self, text: str) -> Self:
+    def search(self, text: str, at_once: bool = False) -> Self:
+        """Types `text` into the search. `at_once`: all but the last character arrive as one input
+        event, the last one typed — for an async search that asks the server on every keystroke
+        and refuses a burst of them (429; Lightning Step's allergen search, 2026-10-11)."""
         self.open()
-        self._input().send_keys(text)
+        field = self._input()
+        if at_once and len(text) > 1:
+            log.info("[%s] search '%s' (at once)", self.label, text)
+            self.js(
+                "const input = arguments[1];"
+                " Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')"
+                ".set.call(input, arguments[2]);"
+                " input.dispatchEvent(new Event('input', {bubbles: true}))",
+                field,
+                text[:-1],
+            )
+            field.send_keys(text[-1])
+        else:
+            field.send_keys(text)
         return self
 
-    def select(self, text: str, shown: str | None = None) -> Self:
+    def select(self, text: str, shown: str | None = None, timeout: float | None = None) -> Self:
         """Picks the option `text`; done when the control shows `shown` — the option's own text
         unless it reads otherwise once chosen (a creatable option `Select "X" for Allergy?` shows
-        "X"; Lightning Step, 2026-10-11)."""
+        "X"). `timeout`: how long the option may take to be offered — an async search under load
+        took over 10 s (Lightning Step, 2026-10-11). A click the "Loading…" overlay takes is
+        repeated until the choice shows."""
         self.open()
         literal = f'"{text}"' if '"' not in text else f"'{text}'"
-        offered = self.waits.until(
-            lambda d: next(
-                iter(d.find_elements(By.XPATH, self._option_xpath.format(literal))), None
-            ),
+        option = (By.XPATH, self._option_xpath.format(literal))
+        self.waits.until(
+            lambda d: next(iter(d.find_elements(*option)), None),
             f"'{text}' offered by {self}",
+            timeout,
         )
         log.info("[%s] select '%s'", self.label, text)
-        offered.click()
         expected = text if shown is None else shown
-        self.waits.until(lambda _: self.selected() == expected, f"'{expected}' chosen in {self}")
+
+        def chosen(driver: WebDriver) -> bool:
+            if self.selected() == expected:
+                return True
+            offered = next(iter(driver.find_elements(*option)), None)
+            if offered is not None:
+                try:
+                    offered.click()
+                except (ElementClickInterceptedException, ElementNotInteractableException):
+                    return False
+            return self.selected() == expected
+
+        self.waits.until(chosen, f"'{expected}' chosen in {self}", timeout)
         return self
 
     def selected(self) -> str:
