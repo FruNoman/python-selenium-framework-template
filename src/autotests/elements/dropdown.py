@@ -389,7 +389,10 @@ class ReactSelectDropdown(Element):
         self._input().send_keys(text)
         return self
 
-    def select(self, text: str) -> Self:
+    def select(self, text: str, shown: str | None = None) -> Self:
+        """Picks the option `text`; done when the control shows `shown` — the option's own text
+        unless it reads otherwise once chosen (a creatable option `Select "X" for Allergy?` shows
+        "X"; Lightning Step, 2026-10-11)."""
         self.open()
         literal = f'"{text}"' if '"' not in text else f"'{text}'"
         offered = self.waits.until(
@@ -400,7 +403,8 @@ class ReactSelectDropdown(Element):
         )
         log.info("[%s] select '%s'", self.label, text)
         offered.click()
-        self.waits.until(lambda _: self.selected() == text, f"'{text}' chosen in {self}")
+        expected = text if shown is None else shown
+        self.waits.until(lambda _: self.selected() == expected, f"'{expected}' chosen in {self}")
         return self
 
     def selected(self) -> str:
