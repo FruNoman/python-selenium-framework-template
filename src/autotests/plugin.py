@@ -29,7 +29,7 @@ from autotests.config.settings import Settings, load_settings
 from autotests.data.loader import TestDataLoader
 from autotests.driver.factory import create_driver
 from autotests.pages.base_page import Browser
-from autotests.support import artifacts
+from autotests.support import artifacts, shared_state
 from autotests.support.waits import Waits
 from autotests.testdata.core import CleanupHandler, TestDataRegistry, sweep_stale
 
@@ -171,6 +171,38 @@ def ui_texts(settings: Settings) -> dict[str, Any]:
 
     path = settings.path(settings.data.dir) / "ui-texts.json"
     return json.loads(path.read_text())["default"] if path.exists() else {}
+
+
+# --- shared state
+
+
+@pytest.fixture(scope="session")
+def shared_state_setter() -> Callable[[str], tuple[Callable[[], Any], Callable[[Any], None]]]:
+    """ONBOARD (when a case needs a global switch in a state): key → (read, write) through the
+    app's API. Override in conftest.py."""
+
+    def setter(key: str) -> tuple[Callable[[], Any], Callable[[Any], None]]:
+        raise NotImplementedError(f"shared_state '{key}': override shared_state_setter")
+
+    return setter
+
+
+@pytest.fixture(autouse=True)
+def _shared_state(
+    request: pytest.FixtureRequest,
+    settings: Settings,
+    shared_state_setter: Callable[[str], tuple[Callable[[], Any], Callable[[Any], None]]],
+) -> Iterator[None]:
+    """`@pytest.mark.shared_state("<key>", <state>)`: the resource in that state for the test,
+    ordered against this machine's other tests (`autotests.support.shared_state`)."""
+    marker = request.node.get_closest_marker("shared_state")
+    if marker is None:
+        yield
+        return
+    key, state = marker.args
+    read, write = shared_state_setter(key)
+    with shared_state.hold(settings.path("build/locks"), key, state, read, write):
+        yield
 
 
 @pytest.fixture(scope="session")

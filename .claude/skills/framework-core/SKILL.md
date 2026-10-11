@@ -196,6 +196,17 @@ docker compose -f docker-compose.grid.yml -f docker-compose.ci.yml up --build \
   --abort-on-container-exit --exit-code-from tests     # exactly like CI
 ```
 
+## Shared state of the environment
+
+A case that needs a global switch (a feature flag, a setting every user sees) in a state says
+`@pytest.mark.shared_state("<key>", <state>)` — never a switch call in its body. The autouse
+`_shared_state` fixture holds a lock file per key (`support/shared_state.py`): same-state tests
+run in parallel, another state waits its turn, the state is set once per turn through the
+project's `shared_state_setter` (ONBOARD: override it in conftest.py — key → (read, write) over the
+app's API). It orders this machine's runs only: another run on the environment can flip it back —
+check the page's state before the step that depends on it, and read a failure there as that first
+(lab9 2026-10-11: turned back on by someone else ~10 min later).
+
 ## CI contract (details: `ci-setup` in the plugin)
 
 One command (`uv run pytest -n $TESTS_THREADS`), config by env (`CI=true`, `RUNNER=grid`,

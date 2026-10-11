@@ -34,6 +34,7 @@ addopts = "-ra --strict-markers -p autotests.plugin --junitxml=build/test-result
 xfail_strict = true
 markers = [
     "as_user(user): the user the test runs as (default: the least privileged one)",
+    "shared_state(key, state): a shared resource of the environment (a global switch) the test needs in a state",
 ]
 log_level = "INFO"
 log_format = "%(asctime)s.%(msecs)03d %(levelname)-5s [%(name)s] %(message)s"

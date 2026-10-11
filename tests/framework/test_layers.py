@@ -18,6 +18,7 @@ from autotests.config.settings import load_settings
 from autotests.data.loader import TestDataLoader
 from autotests.data.models import TestData
 from autotests.data.placeholders import format_java, process
+from autotests.support.shared_state import hold
 from autotests.testdata.core import CleanupHandler, TestDataRegistry
 
 # --- settings
@@ -136,6 +137,28 @@ def test_cleanup_deletes_newest_first_and_survives_a_failed_delete() -> None:
         assert deleted == ["last", "first"], "newest first, the rest after a failure"
     with check:
         assert failures and "broken" in failures[0], "the failure reported"
+
+
+# --- shared state
+
+
+def test_shared_state_is_set_only_when_it_differs(tmp_path: Path) -> None:
+    switch = {"on": True}
+    writes: list[bool] = []
+
+    def write(value: bool) -> None:
+        writes.append(value)
+        switch["on"] = value
+
+    with hold(tmp_path, "feature", False, lambda: switch["on"], write):
+        inside = switch["on"]
+    with hold(tmp_path, "feature", False, lambda: switch["on"], write):
+        pass
+
+    with check:
+        assert inside is False, "the test runs in the state it asked for"
+    with check:
+        assert writes == [False], "set once; the second test found it so"
 
 
 # --- API
