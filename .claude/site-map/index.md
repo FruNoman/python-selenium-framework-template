@@ -5,7 +5,7 @@ Read this file plus the area file(s) you are about to touch — never the whole
 directory (`site-map` §0). Base URLs come from the active test-env file
 `src/test/resources/env/<test.env>.yml`.
 
-ONBOARD: seeded during `onboard-new-project` stage 2 (web-automation plugin) with the entry page, the
+ONBOARD: seeded during `qa-core:onboard-new-project` stage 2 with the entry page, the
 auth mechanism (from `login-strategies` step 1) and the locator strategy (does
 the app expose `data-testid`/`data-qa`?); areas and their pages come later with
 `add-page`, each widget noted with the standard element that handles it.

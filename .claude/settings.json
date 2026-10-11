@@ -8,11 +8,12 @@
     }
   },
   "enabledPlugins": {
-    "web-automation@qa-automation-toolkit": true
+    "qa-core@qa-automation-toolkit": true,
+    "qa-python@qa-automation-toolkit": true
   },
   "permissions": {
     "allow": [
-      "mcp__plugin_web-automation_selenium__*",
+      "mcp__plugin_qa-core_selenium__*",
       "Bash(uv run pytest:*)",
       "Bash(uv run ruff:*)",
       "Bash(uv sync:*)",

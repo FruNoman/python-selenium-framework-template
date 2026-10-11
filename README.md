@@ -4,7 +4,7 @@ Starting point for a new UI-automation project: **Python + Selenium 4 + pytest**
 per test, page objects over standard elements declared like `@FindBy`, explicit waits only, test
 data from JSON and typed UI texts as fixtures, API preconditions as yield fixtures, failure artifacts, logs per
 test, local / Grid / CI runs in parallel — plus the Claude Code setup that drives onboarding and
-test writing: the `web-automation` plugin from
+test writing: the `qa-core` and `qa-python` plugins from
 [qa-automation-toolkit](https://github.com/FruNoman/qa-automation-toolkit) is enabled in
 `.claude/settings.json`. This repo keeps only `framework-core` (the framework's rules) and
 `.claude/site-map/` (the map of the app under test).
@@ -18,7 +18,7 @@ for known bugs. The test-data JSON (placeholders, camelCase keys) reads the same
 
 ## Start a new project
 
-1. Create a repo from this template, open it in Claude Code (accept the `web-automation` plugin).
+1. Create a repo from this template, open it in Claude Code (accept the plugins).
 2. Ask: *"onboard this project"* — `onboard-new-project` works in stages and stops for your go
    after each: discovery and interview → skeleton (env files, the example replaced by the app's
    entry page, green locally, on the Grid and like CI) → base architecture (login, API client,

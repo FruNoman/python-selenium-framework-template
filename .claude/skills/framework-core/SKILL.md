@@ -10,15 +10,15 @@ framework is a pytest plugin with markers, data and DTOs are pydantic models, cl
 fixture, elements are descriptors. The invariants are the plugin's (fresh browser per test, waits
 for what an action produces, preconditions through the API, failure evidence); the mechanisms are
 pytest's — never a port of a Java idiom (DI classes, builders, Java date patterns). Workflow (writing and running tests, login,
-onboarding, site map) comes from the `web-automation` plugin enabled in `.claude/settings.json`.
+onboarding, site map) comes from the `qa-core` + `qa-python` plugins enabled in `.claude/settings.json` (their Selenium references).
 
 ## Which skill when — load it before the work, not after
 
-The routing table lives in the plugin: **`web-automation:which-skill`** — which skill covers which
+The routing table lives in the plugin: **`qa-core:which-skill`** — which skill covers which
 task, which subagent does the bulk reading. Not copied here: a copy per project drifts. This file
 holds the framework's **rules**; the plugin the **workflow**.
 
-**Writing or changing a test, or its data → load `web-automation:test-data` first, always.** Data
+**Writing or changing a test, or its data → load `qa-python:test-data` first, always.** Data
 reaches a test as a fixture named after it (`web_form_data`), the app's texts as `<area>_texts`;
 no `loader.load(...)` in a test body.
 
