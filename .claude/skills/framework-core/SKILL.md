@@ -1,13 +1,15 @@
 ---
 name: framework-core
-description: The rules of this Python + Selenium + pytest framework core — a fresh browser per test (the `browser` fixture), page objects created per test and returned by the actions that lead to them, the standard elements declared as class attributes (descriptors — tables, dropdowns, checkboxes… no new element classes unless asked), explicit waits only (implicit 0), JSON test data reaching tests as fixtures, API preconditions with automatic cleanup, failure artifacts, known bugs as xfail(strict=True), settings in layers (YAML, env file, env vars, options). Use whenever writing or changing pages, elements, tests, test data, browser config or settings.
+description: The rules of this Python + Selenium + pytest framework core — a fresh browser per test (the `browser` fixture), page objects created per test and returned by the actions that lead to them, the standard elements declared as class attributes (descriptors — tables, dropdowns, checkboxes… no new element classes unless asked), explicit waits only (implicit 0), JSON test data and typed UI texts reaching tests as fixtures, API preconditions as yield fixtures, failure artifacts, known bugs as xfail(strict=True), settings in layers (YAML, env file, env vars, options). Use whenever writing or changing pages, elements, tests, test data, browser config or settings.
 ---
 
 # Framework core — the rules (python-selenium)
 
-The same rules as the Java stacks (selenium-framework-template), carried by Python's own
-mechanisms: what a Java project does with Spring scopes, `@FindBy` and TestNG, this one does with
-pytest fixtures, element descriptors and markers. Workflow (writing and running tests, login,
+A pytest framework, written the Python way: dependencies are fixtures (no container), the
+framework is a pytest plugin with markers, data and DTOs are pydantic models, cleanup is a `yield`
+fixture, elements are descriptors. The invariants are the plugin's (fresh browser per test, waits
+for what an action produces, preconditions through the API, failure evidence); the mechanisms are
+pytest's — never a port of a Java idiom (DI classes, builders, Java date patterns). Workflow (writing and running tests, login,
 onboarding, site map) comes from the `web-automation` plugin enabled in `.claude/settings.json`.
 
 ## Which skill when — load it before the work, not after
@@ -105,13 +107,13 @@ Layers, later wins: `config/application.yml` → `config/application-ci.yml` (`C
 
 ```
 src/autotests/          config/ driver/ support/ elements/ pages/base_page.py data/ api/client.py
-                        auth/ testdata/core.py plugin.py          ← the framework (ported as is)
+                        auth/ plugin.py                            ← the framework
 src/autotests/pages/<area>/        the app's pages              (orders/order_page.py)
 src/autotests/api/<area>/          the app's API clients + dto.py
-src/autotests/testdata/<area>/     fixtures + cleanup handlers of what tests create
+src/autotests/testdata/<area>.py   functions building what tests create through the API
 tests/<tms-suite>/…/test_<leaf>.py  tests, mirroring the TMS tree
 tests/steps/<area>.py              flows several tests need as preconditions
-tests/conftest.py                  page, data and texts fixtures; cleanup_handlers; authenticate
+tests/conftest.py                  page, data, texts and precondition fixtures; authenticate
 resources/env/ resources/data/ resources/files/
 ```
 
@@ -121,14 +123,19 @@ A package past ~10 modules splits by area; a module past ~500 lines splits by sc
 
 - Data: `resources/data/<model>.json` (`OrderData` ← `order-data.json`), variants by name; the
   main one is `"default"`; `resources/data/<env>/<file>` replaces the shared file whole.
-  Placeholders (`{{uniqueTimestamp}}`, `{{inDays:3:yyyy-MM-dd}}`, `{{text:N}}`, Faker…) — the same
-  syntax as the Java stacks, re-resolved on every load. Models extend `TestData` (pydantic:
+  Placeholders (`{{uniqueTimestamp}}`, `{{inDays:3}}` = an ISO date, `{{inDays:3:%m/%d/%Y}}`
+  strftime, `{{text:N}}`, Faker…) — re-resolved on every load. Models extend `TestData` (pydantic:
   frozen, unknown keys refused, camelCase JSON keys → snake_case fields, repr = the class name
   only; secrets `SecretStr`).
 - In tests: `order_data = data_fixture(OrderData)` in conftest → `def test_x(..., order_data)`;
   another variant: `@pytest.mark.parametrize("order_data", ["prn"], indirect=True)`; a data table:
   `parametrize(..., variant_names(OrderData), indirect=True)` — the test id carries the variant
-  name. The app's texts: `ui-texts.json` → `orders_texts = texts_fixture("orders")`.
+  name. The app's texts: `ui-texts.json`, one typed model per area in `data/texts.py`
+  (`class OrdersTexts(UiTexts)`, its `area` key) → `orders_texts = texts_fixture(OrdersTexts)`; a
+  test annotates `orders_texts: OrdersTexts` — pyright checks every name.
+- **What goes to data files**: what varies — per environment, per variant, per user, generated
+  (unique, dates) — and the app's texts. A value one test uses once and that changes with nothing
+  (a count, a fixed option of the case) may stay a named constant or a literal in the test.
 - Logins: `resources/data/user-data.json` (row per `User`, lower case) through `credentials(user)`
   — never env vars, CI secrets or YAML. Tooling tokens (TMS, CI) only in a git-ignored
   `.env.local`.
@@ -136,10 +143,12 @@ A package past ~10 modules splits by area; a module past ~500 lines splits by sc
   returns parsed responses (`ApiResponse.expect_status(201).as_model(OrderResponse)`) — never a
   dict built field by field; bodies logged with secrets masked. `api.as_user(user)` — ONBOARD
   the app's auth. `WebClient` for plain HTTP to the web app (redirects are answers).
-- Preconditions through the API, not through other screens. What a test creates is registered
-  **before** the request (`created.register(CreatedOrder(number))`) and deleted after the test
-  by its `CleanupHandler` — also when the test fails; `sweep_stale` deletes what a killed run left
-  (the naming prefix + age in the app's time). Never delete by hand in a test.
+- Preconditions through the API, not through other screens: a fixture creates, `yield`s, and
+  deletes in `finally` — also when the test fails. Keep the id as soon as the app hands it out
+  (a callback, before the save completes), so a save failing midway is cleaned up too. Building
+  a record is a plain function (`testdata/orders.py: create_order(...)`), not a class. Never
+  delete by hand in a test. A run killed midway leaves records: sweep them at the next run's
+  start in a session fixture only when the app's names tell ours apart.
 
 ## Failures
 
@@ -160,7 +169,8 @@ junit.xml` for CI and the TMS.
   precondition failed, a known bug blocking the next steps). The message says what was expected.
 - **An assertion only checks**: no action or navigation inside `assert` — the action is its own
   statement before it.
-- **Known product bugs**: `@pytest.mark.xfail(strict=True, reason="<the finding>")` — the test
+- **Known product bugs**: `@pytest.mark.xfail(strict=True, reason="<the finding>")` (a race that
+  shows only at some speeds: `strict=False` with that in the reason, until it is understood) — the test
   runs every time: XFAIL while the bug is there (with failure artifacts as proof), and a fixed bug
   turns the run **red** (XPASS, `xfail_strict = true`) — drop the marker then. Never `skip` it,
   never loosen the assertion. Prove it before marking: run it, read the artifacts — it must fail on
@@ -174,6 +184,11 @@ junit.xml` for CI and the TMS.
   that must be unique across workers: `{{uniqueTimestamp}}` (carries the worker number). A resource
   of the environment several tests switch (a feature flag): a file lock per resource, not a module
   global — ask before adding one.
+- A test that hangs fails alone: `timeout = 300` (pytest-timeout, setup included). The HTML
+  report `build/reports/report.html` (pytest-html) carries each failure's screenshot and URL.
+- A shared resource of the environment (a global switch): `@pytest.mark.shared_state(key, state)`
+  — same-state tests run together, another state waits (looking again, never queued behind the
+  holders), the rarer state's tests are collected first so a run switches once and back.
 - `tests/framework` is scaffolding (the wiring on about:blank + onboarding's layer proofs): it goes
   once the project's TMS cases cover the layers.
 
@@ -181,7 +196,9 @@ junit.xml` for CI and the TMS.
 
 `ruff format` (Black style, 100 columns) and `ruff check` (pyflakes, isort, bugbear, pyupgrade,
 naming) and `pyright` (standard mode: what a compiler would catch — a None where a str goes, a
-wrong argument) — `make check` runs all three, CI too. Type hints on public functions; `from __future__ import annotations`; docstrings say *why*, in the project's words.
+wrong argument) — `make check` runs all three, CI too. Type hints on public functions; `from __future__ import annotations`; docstrings say *what and why* — the behaviour, briefly; when and
+where it was found goes to the site map, not the code. A lint rule a whole folder breaks on purpose
+(case ids in test names: N802) is ignored once in `per-file-ignores`, never by a `noqa` per line.
 Blank lines between Arrange / Act / Assert and around each `with check:`. Python edits through
 the editor (Edit tool), never through sed/heredoc scripts on source files.
 

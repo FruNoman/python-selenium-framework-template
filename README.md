@@ -2,7 +2,7 @@
 
 Starting point for a new UI-automation project: **Python + Selenium 4 + pytest** — a fresh browser
 per test, page objects over standard elements declared like `@FindBy`, explicit waits only, test
-data from JSON as fixtures, API preconditions with automatic cleanup, failure artifacts, logs per
+data from JSON and typed UI texts as fixtures, API preconditions as yield fixtures, failure artifacts, logs per
 test, local / Grid / CI runs in parallel — plus the Claude Code setup that drives onboarding and
 test writing: the `web-automation` plugin from
 [qa-automation-toolkit](https://github.com/FruNoman/qa-automation-toolkit) is enabled in
@@ -34,11 +34,11 @@ for known bugs. The test-data JSON (placeholders, camelCase keys) reads the same
 | `autotests/elements/` | The standard elements, by ARIA roles and common markup: `Button`, `Input`, `CheckBox`, `RadioGroup`, `FileUpload`, `Calendar`; `SelectDropdown` / `ListDropdown` / `AriaDropdown` (portal listboxes, async search) / `MultiSelectDropdown` / `ReactSelectDropdown` / `Select2Dropdown` (jQuery select2 4.x — ⚠ proven on one app, Lightning Step, 2026-10-11) (one `Dropdown` protocol); `Table`, `Modal`, `Toasts`, `Tabs`, `Menu`, `Pagination`. Declared as class attributes of a page, found again on every use, every action logged. **Proven on every widget variant of the qa-playground `/widgets` gallery — 17 tests, Chrome and Firefox (2026-10-11).** |
 | `autotests/pages/base_page.py` | `BasePage(browser)`: `path`, `is_loaded()`, `open()`, `get()`, `wait_loaded()`; the app's pages in `pages/<area>/` |
 | `autotests/support/` | `Waits` (explicit only: `until`, `for_new_document`, `for_change`), failure artifacts, `shared_state` (`@pytest.mark.shared_state(key, state)` — a global switch in a state, a lock file per key) |
-| `autotests/data/` | `TestDataLoader` (JSON variants, per-env files, placeholders `{{uniqueTimestamp}}`, `{{inDays:3:yyyy-MM-dd}}`, Faker…), `TestData` models (pydantic), `data_fixture` / `texts_fixture` |
+| `autotests/data/` | `TestDataLoader` (JSON variants, per-env files, placeholders `{{uniqueTimestamp}}`, `{{inDays:3}}` (ISO; `{{inDays:3:%m/%d/%Y}}` strftime), Faker…), `TestData` models (pydantic), `data_fixture`, typed texts (`UiTexts` models, `texts_fixture`) |
 | `autotests/api/` | `ApiClient` (requests, DTOs in and out, secrets masked in the log; ONBOARD: auth; `post_form` for server-rendered forms), `forms.py` (`form_fields(html, form_id)` — what a browser would post — + `with_values`), `WebClient` (plain HTTP, redirects are answers) |
-| `autotests/testdata/` | `TestDataRegistry` + `CleanupHandler`: what a test creates is deleted after it, also on failure; `sweep_stale` for killed runs |
+| `autotests/testdata/` | functions building what tests create through the API, one module per area; the fixture that calls one yields and deletes in `finally` |
 | `autotests/auth/` | `User` (least privileged first), `Credentials` (from `resources/data/user-data.json`) |
-| `autotests/plugin.py` | the pytest plugin: options, `settings`, `browser`, `user`, `authenticate`, data/texts/cleanup/api fixtures, logs per test, artifacts on failure and xfail |
+| `autotests/plugin.py` | the pytest plugin: options, `settings`, `browser`, `user`, `authenticate`, data/texts/api fixtures, the rarer shared state collected first, logs per test, artifacts on failure and xfail (screenshot in the HTML report), a timeout per test |
 
 Tests: `tests/framework` (the wiring on about:blank — no app or network needed; a project drops
 it once its TMS cases cover the layers) and **the example** `tests/example` (Selenium's test form:

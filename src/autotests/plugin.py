@@ -6,22 +6,25 @@ Fixtures a test (or a page/data fixture in conftest.py) asks for:
   user              who the test runs as (`as_user(User.ADMIN)` mark; default: the first User)
   test_data_loader  JSON test data (session); data reaches tests through `data_fixture(...)`
   ui_texts          the app's fixed texts (session); per area through `texts_fixture(...)`
-  created           what this test creates, deleted after it (cleanup handlers: `cleanup_handlers`)
   api               the app's API client (session)
 
-Overridable in conftest.py: `cleanup_handlers` (the app's CleanupHandlers), `authenticate`
-(how a browser is logged in as a user — ONBOARD: login-strategies).
+Overridable in conftest.py: `authenticate` (how a browser is logged in as a user — ONBOARD:
+login-strategies), `shared_state_setter`. What a test creates is cleaned up by the fixture that
+creates it (a `yield` fixture: create, yield, delete).
 """
 
 from __future__ import annotations
 
-import datetime as dt
+import base64
+import contextlib
 import logging
+from collections import Counter
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
 
 import pytest
+from selenium.common.exceptions import WebDriverException
 
 from autotests.api.client import ApiClient
 from autotests.auth.users import Credentials, User
@@ -31,7 +34,6 @@ from autotests.driver.factory import create_driver
 from autotests.pages.base_page import Browser
 from autotests.support import artifacts, shared_state
 from autotests.support.waits import Waits
-from autotests.testdata.core import CleanupHandler, TestDataRegistry, sweep_stale
 
 log = logging.getLogger("autotests")
 
@@ -57,6 +59,28 @@ def pytest_configure(config: pytest.Config) -> None:
         "browser.headless": False if config.getoption("--headed") else None,
     }
     config._autotests_settings = load_settings(cli)  # type: ignore[attr-defined]
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """The tests of a shared resource's less common state run first, all together: the resource
+    is switched once for them and once back, instead of the states taking turns all run long — a
+    test waiting for another state waits for every holder of the current one. Every xdist worker
+    sorts the same way, and its scheduler follows the order."""
+    states: dict[str, Counter[Any]] = {}
+    for item in items:
+        marker = item.get_closest_marker("shared_state")
+        if marker is not None:
+            key, state = marker.args
+            states.setdefault(key, Counter())[state] += 1
+
+    def rare(item: pytest.Item) -> bool:
+        marker = item.get_closest_marker("shared_state")
+        if marker is None:
+            return False
+        key, state = marker.args
+        return state != states[key].most_common(1)[0][0]
+
+    items[:] = [i for i in items if rare(i)] + [i for i in items if not rare(i)]
 
 
 # --- settings, logs
@@ -146,7 +170,8 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[Any]) -> 
         settings: Settings = item.config._autotests_settings  # type: ignore[attr-defined]
         folder = settings.path(settings.artifacts.dir) / artifacts.folder_name(item.nodeid)
         failure = str(call.excinfo.value).splitlines()[0] if call.excinfo else "?"
-        artifacts.save(browser.driver, folder, item.nodeid, failure)
+        saved = artifacts.save(browser.driver, folder, item.nodeid, failure)
+        _attach_to_html_report(item, report, saved / "screenshot.png", browser)
     if report.when == "call":
         log.info(
             "%s %s (%.1f s)",
@@ -154,6 +179,23 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[Any]) -> 
             item.nodeid,
             report.duration,
         )
+
+
+def _attach_to_html_report(
+    item: pytest.Item, report: pytest.TestReport, screenshot: Path, browser: Browser
+) -> None:
+    """The failure's screenshot and URL in the HTML report (build/reports/report.html), when
+    pytest-html is on."""
+    if item.config.pluginmanager.getplugin("html") is None:
+        return
+    from pytest_html import extras as html_extras
+
+    extras = getattr(report, "extras", [])
+    with contextlib.suppress(WebDriverException):  # a dead browser has no URL
+        extras.append(html_extras.url(browser.driver.current_url))
+    if screenshot.exists():
+        extras.append(html_extras.png(base64.b64encode(screenshot.read_bytes()).decode()))
+    report.extras = extras  # type: ignore[attr-defined] — pytest-html reads it
 
 
 # --- test data
@@ -203,29 +245,6 @@ def _shared_state(
     read, write = shared_state_setter(key)
     with shared_state.hold(settings.path("build/locks"), key, state, read, write):
         yield
-
-
-@pytest.fixture(scope="session")
-def cleanup_handlers() -> list[CleanupHandler]:
-    """Override in conftest.py with the app's handlers (one per kind of record tests create)."""
-    return []
-
-
-@pytest.fixture(scope="session", autouse=True)
-def _sweep_stale_test_data(cleanup_handlers: list[CleanupHandler], worker_id: str) -> None:
-    """What a killed run left — once per run (the first xdist worker, or a run without xdist;
-    `worker_id` is pytest-xdist's fixture)."""
-    if worker_id in ("master", "gw0"):
-        sweep_stale(cleanup_handlers, dt.timedelta(hours=2))
-
-
-@pytest.fixture
-def created(cleanup_handlers: list[CleanupHandler]) -> Iterator[TestDataRegistry]:
-    registry = TestDataRegistry(cleanup_handlers)
-    yield registry
-    failures = registry.clean_up()
-    if failures:
-        log.warning("cleanup left records behind: %s", failures)
 
 
 # --- API

@@ -2,7 +2,7 @@
 
     # tests/conftest.py
     web_form_data = data_fixture(WebFormData)          # fixture "web_form_data"
-    login_texts = texts_fixture("login")               # the app's texts of one area
+    login_texts = texts_fixture(LoginTexts)            # the app's texts of one area (typed)
 
     def test_submit(web_form_page, web_form_data): ...                    # variant "default"
 
@@ -24,6 +24,7 @@ import pytest
 from pydantic import BaseModel
 
 from autotests.data.loader import TestDataLoader
+from autotests.data.texts import UiTexts
 
 
 def data_fixture(model: type[BaseModel]) -> Callable[..., Any]:
@@ -38,42 +39,15 @@ def data_fixture(model: type[BaseModel]) -> Callable[..., Any]:
     return fixture
 
 
-def texts_fixture(area: str) -> Callable[..., Any]:
-    """The app's fixed texts of one area of ui-texts.json — `<area>_texts`. Loaded once per run."""
+def texts_fixture[T: UiTexts](model: type[T]) -> Callable[..., T]:
+    """The app's fixed texts of one area of ui-texts.json (`model.area`) as its typed model —
+    `<area>_texts`. Loaded once per run."""
 
     @pytest.fixture(scope="session")
-    def fixture(ui_texts: dict[str, Any]) -> Any:
-        if area not in ui_texts:
-            raise KeyError(f"No area '{area}' in ui-texts.json: {list(ui_texts)}")
-        return _Texts(area, ui_texts[area])
+    def fixture(ui_texts: dict[str, Any]) -> T:
+        if model.area not in ui_texts:
+            raise KeyError(f"No area '{model.area}' in ui-texts.json: {list(ui_texts)}")
+        return model.model_validate(ui_texts[model.area])
 
+    fixture.__doc__ = f"{model.__name__}: ui-texts.json area '{model.area}'"
     return fixture
-
-
-class _Texts:
-    """An area's texts as attributes (`login_texts.wrong_credentials`); nested areas nest."""
-
-    def __init__(self, area: str, values: dict[str, Any]) -> None:
-        self._area = area
-        for key, value in values.items():
-            setattr(
-                self,
-                _snake(key),
-                _Texts(f"{area}.{key}", value) if isinstance(value, dict) else value,
-            )
-
-    def __getattr__(self, name: str) -> Any:
-        raise AttributeError(f"No text '{name}' in ui-texts.json area '{self._area}'")
-
-    def __repr__(self) -> str:
-        return f"Texts[{self._area}]"
-
-
-def _snake(name: str) -> str:
-    out = []
-    for char in name:
-        if char.isupper():
-            out.append("_" + char.lower())
-        else:
-            out.append(char)
-    return "".join(out).replace("-", "_")

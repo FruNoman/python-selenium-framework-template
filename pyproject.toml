@@ -13,6 +13,8 @@ dependencies = [
     "pyyaml==6.0.3",
     "requests==2.34.2",
     "faker==40.43.0",
+    "pytest-timeout==2.4.0",
+    "pytest-html==4.1.1",
 ]
 
 [dependency-groups]
@@ -31,7 +33,11 @@ packages = ["src/autotests"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # the framework's fixtures, hooks and options come from one plugin module
-addopts = "-ra --strict-markers -p autotests.plugin --junitxml=build/test-results/junit.xml"
+addopts = """-ra --strict-markers -p autotests.plugin --junitxml=build/test-results/junit.xml
+  --html=build/reports/report.html --self-contained-html"""
+# a hung test (a dead Grid session, a wait without end) fails alone instead of holding the run;
+# setup counts: the shared-state wait and the API preconditions are inside it
+timeout = 300
 # a known product bug: @pytest.mark.xfail(strict=True, reason="<the finding>") — it runs every
 # time, XFAIL while the bug is there, and a fixed bug turns the run red (XPASS) to drop the marker
 xfail_strict = true
@@ -51,6 +57,10 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "N", "RUF"]
 ignore = ["RUF001", "RUF002", "RUF003"]  # en dashes and arrows in prose are intended
+
+[tool.ruff.lint.per-file-ignores]
+# test names carry the TMS case id as is: test_LS316_…, test_C123_…
+"tests/**" = ["N802"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["autotests"]
