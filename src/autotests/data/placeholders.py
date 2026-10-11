@@ -1,10 +1,9 @@
-"""Placeholders of the test-data JSON — every occurrence gets its own value. The same syntax as the
-Java stacks, so a data file reads the same in any of the project's frameworks:
+"""Placeholders of the test-data JSON — every occurrence gets its own value:
 
 | Placeholder | Value |
 |---|---|
-| {{today:<pattern>}}, {{tomorrow:…}}, {{yesterday:…}}, {{inDays:N:<pattern>}},
-  {{inMonths:N:<pattern>}} | a date; the pattern in Java's notation (yyyy-MM-dd, MM/dd/yyyy) |
+| {{today}}, {{tomorrow}}, {{yesterday}}, {{inDays:N}}, {{inMonths:N}} | a date, ISO (2026-10-11)
+  — what a model's `dt.date` field takes; `…:<strftime>` for other text ({{inDays:-1:%m/%d/%Y}}) |
 | {{random:N}} | an N-digit number, no leading zero |
 | {{text:N}} | N letters — for length limits |
 | {{uuid}}, {{timestamp}}, {{uniqueTimestamp}} | unique values; uniqueTimestamp never twice in a
@@ -31,27 +30,9 @@ from faker import Faker
 _faker = Faker("en_US")
 _resolvers: dict[str, Callable[[], str]] = {}
 
-_DATE = re.compile(r"\{\{(today|tomorrow|yesterday|inDays:(-?\d+)|inMonths:(-?\d+)):([^}]+)}}")
+_DATE = re.compile(r"\{\{(today|tomorrow|yesterday|inDays:(-?\d+)|inMonths:(-?\d+))(?::([^}]+))?}}")
 _RANDOM = re.compile(r"\{\{random:(\d+)}}")
 _TEXT = re.compile(r"\{\{text:(\d+)}}")
-
-# Java DateTimeFormatter letters → strftime, longest first
-_JAVA_TOKENS = [
-    ("yyyy", "%Y"),
-    ("yy", "%y"),
-    ("MMMM", "%B"),
-    ("MMM", "%b"),
-    ("MM", "%m"),
-    ("dd", "%d"),
-    ("EEEE", "%A"),
-    ("EEE", "%a"),
-    ("HH", "%H"),
-    ("hh", "%I"),
-    ("mm", "%M"),
-    ("ss", "%S"),
-    ("a", "%p"),
-]
-_SINGLE = {"M": lambda d: str(d.month), "d": lambda d: str(d.day)}
 
 _lock = threading.Lock()
 _last_stamp = [0]
@@ -72,25 +53,9 @@ def unique_timestamp() -> str:
     return f"{now}{worker[2:]}" if worker.startswith("gw") else str(now)
 
 
-def format_java(date: dt.date | dt.datetime, pattern: str) -> str:
-    """A date formatted by a Java DateTimeFormatter pattern (the common letters)."""
-    out, i = [], 0
-    while i < len(pattern):
-        if pattern[i] == "'":  # quoted literal
-            end = pattern.index("'", i + 1)
-            out.append(pattern[i + 1 : end])
-            i = end + 1
-            continue
-        for token, directive in _JAVA_TOKENS:
-            if pattern.startswith(token, i):
-                out.append(date.strftime(directive))
-                i += len(token)
-                break
-        else:
-            char = pattern[i]
-            out.append(_SINGLE[char](date) if char in _SINGLE else char)
-            i += 1
-    return "".join(out)
+def _formatted(match: re.Match[str]) -> str:
+    date, pattern = _date(match), match.group(4)
+    return date.strftime(pattern) if pattern else date.isoformat()
 
 
 def _date(match: re.Match[str]) -> dt.date:
@@ -118,7 +83,7 @@ def _random_digits(n: int) -> str:
 def process(text: str) -> str:
     for name, resolve in _resolvers.items():
         text = re.sub(re.escape("{{" + name + "}}"), lambda _, r=resolve: r(), text)
-    text = _DATE.sub(lambda m: format_java(_date(m), m.group(4)), text)
+    text = _DATE.sub(_formatted, text)
     text = _RANDOM.sub(lambda m: _random_digits(int(m.group(1))), text)
     text = _TEXT.sub(
         lambda m: "".join(random.choices(string.ascii_lowercase, k=int(m.group(1)))), text

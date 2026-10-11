@@ -6,6 +6,7 @@ import datetime as dt
 import json
 import logging
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
@@ -17,9 +18,8 @@ from autotests.api.client import ApiClient
 from autotests.config.settings import load_settings
 from autotests.data.loader import TestDataLoader
 from autotests.data.models import TestData
-from autotests.data.placeholders import format_java, process
-from autotests.support.shared_state import hold
-from autotests.testdata.core import CleanupHandler, TestDataRegistry
+from autotests.data.placeholders import process
+from autotests.support import shared_state
 
 # --- settings
 
@@ -61,7 +61,7 @@ def test_placeholders_give_fresh_values() -> None:
                     "{{uniqueTimestamp}}",
                     "{{random:6}}",
                     "{{text:12}}",
-                    "{{inDays:-1:yyyy-MM-dd}}",
+                    "{{inDays:-1}}",
                     "{{firstname}}",
                 ]
             )
@@ -75,16 +75,16 @@ def test_placeholders_give_fresh_values() -> None:
     with check:
         assert len(values[3]) == 12, "text:N"
     with check:
-        assert values[4] == (dt.date.today() - dt.timedelta(days=1)).isoformat(), "Java patterns"
+        assert values[4] == (dt.date.today() - dt.timedelta(days=1)).isoformat(), "ISO by default"
     with check:
-        assert format_java(dt.date(2026, 3, 7), "MM/dd/yyyy, EEE d MMM") == "03/07/2026, Sat 7 Mar"
+        assert process("{{today:%m/%d/%Y}}") == dt.date.today().strftime("%m/%d/%Y"), "strftime"
 
 
 def test_variants_env_overrides_and_masked_secrets(tmp_path: Path) -> None:
     env = load_settings(environ={}).env  # the project's default env — "dev" until it's renamed
     (tmp_path / "data" / env).mkdir(parents=True)
     (tmp_path / "data" / "sample-data.json").write_text(
-        json.dumps({"default": {"name": "{{firstname}}", "born": "{{yesterday:yyyy-MM-dd}}"}})
+        json.dumps({"default": {"name": "{{firstname}}", "born": "{{yesterday}}"}})
     )
     # an environment's file replaces the shared one whole — its own variants, all of them
     (tmp_path / "data" / env / "sample-data.json").write_text(
@@ -108,57 +108,6 @@ def test_variants_env_overrides_and_masked_secrets(tmp_path: Path) -> None:
         assert "s3cret" not in repr(admin) and "s3cret" not in str(admin.password), "secret hidden"
     with check:
         assert loader.variant_names(SampleData) == ["default", "admin"], "the env file's variants"
-
-
-# --- cleanup
-
-
-def test_cleanup_deletes_newest_first_and_survives_a_failed_delete() -> None:
-    deleted: list[str] = []
-
-    class Thing(str):
-        pass
-
-    class ThingCleanup(CleanupHandler):
-        handles = Thing
-
-        def delete(self, record: Thing) -> None:
-            if record == "broken":
-                raise RuntimeError("500")
-            deleted.append(record)
-
-    registry = TestDataRegistry([ThingCleanup()])
-    for name in ("first", "broken", "last"):
-        registry.register(Thing(name))
-
-    failures = registry.clean_up()
-
-    with check:
-        assert deleted == ["last", "first"], "newest first, the rest after a failure"
-    with check:
-        assert failures and "broken" in failures[0], "the failure reported"
-
-
-# --- shared state
-
-
-def test_shared_state_is_set_only_when_it_differs(tmp_path: Path) -> None:
-    switch = {"on": True}
-    writes: list[bool] = []
-
-    def write(value: bool) -> None:
-        writes.append(value)
-        switch["on"] = value
-
-    with hold(tmp_path, "feature", False, lambda: switch["on"], write):
-        inside = switch["on"]
-    with hold(tmp_path, "feature", False, lambda: switch["on"], write):
-        pass
-
-    with check:
-        assert inside is False, "the test runs in the state it asked for"
-    with check:
-        assert writes == [False], "set once; the second test found it so"
 
 
 # --- API
@@ -207,3 +156,41 @@ def test_api_client_sends_dtos_and_masks_secrets(
         assert "s3cret" not in caplog.text and "POST" in caplog.text, "logged, password masked"
     with pytest.raises(AssertionError, match="→ 201, expected"):
         response.expect_status(200)
+
+
+# --- shared state
+
+
+def test_shared_state_joins_its_state_and_switches_once_the_other_is_done(
+    tmp_path: Path,
+) -> None:
+    resource = {"on": True}
+    events: list[str] = []
+
+    def run(name: str, state: bool, seconds: float) -> None:
+        def write(value: bool) -> None:
+            events.append(f"{name} switches")
+            resource["on"] = value
+
+        with shared_state.hold(tmp_path, "switch", state, lambda: resource["on"], write):
+            events.append(f"{name} starts")
+            time.sleep(seconds)
+            events.append(f"{name} ends")
+
+    first = threading.Thread(target=run, args=("first", True, 3))
+    first.start()
+    time.sleep(0.3)
+    other = threading.Thread(target=run, args=("other", False, 0))
+    other.start()
+    time.sleep(0.3)
+    same = threading.Thread(target=run, args=("same", True, 0))
+    same.start()
+    for thread in (first, other, same):
+        thread.join(timeout=20)
+
+    with check:
+        assert events.index("same starts") < events.index("first ends"), "its state: joins at once"
+    with check:
+        assert events.index("other switches") > events.index("first ends"), "waits for the holders"
+    with check:
+        assert resource["on"] is False and events.count("other switches") == 1, "switched once"

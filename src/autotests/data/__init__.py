@@ -4,10 +4,12 @@ from autotests.data.fixtures import data_fixture, texts_fixture
 from autotests.data.loader import TestDataLoader, variant_names
 from autotests.data.models import TestData
 from autotests.data.placeholders import register_resolver
+from autotests.data.texts import UiTexts
 
 __all__ = [
     "TestData",
     "TestDataLoader",
+    "UiTexts",
     "data_fixture",
     "register_resolver",
     "texts_fixture",
