@@ -59,7 +59,11 @@ def create_driver(settings: Settings) -> WebDriver:
     chrome = settings.browser.name == "chrome"
     options = _chrome_options(settings) if chrome else _firefox_options(settings)
     if settings.runner == "local":
-        driver = webdriver.Chrome(options=options) if chrome else webdriver.Firefox(options=options)
+        driver = (
+            webdriver.Chrome(options=_chrome_options(settings))
+            if chrome
+            else webdriver.Firefox(options=_firefox_options(settings))
+        )
     else:
         executor = (
             ChromiumRemoteConnection(settings.grid.url, "goog", "chrome")

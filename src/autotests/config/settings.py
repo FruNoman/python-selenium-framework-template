@@ -6,6 +6,7 @@ One immutable `Settings` per run (the `settings` fixture). Nothing reads os.envi
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal
 
@@ -95,24 +96,24 @@ def _set(tree: dict[str, Any], dotted: str, value: Any) -> None:
 
 
 def load_settings(
-    cli: dict[str, Any] | None = None, environ: dict[str, str] | None = None
+    cli: dict[str, Any] | None = None, environ: Mapping[str, str] | None = None
 ) -> Settings:
     """Layers, later wins: application.yml, application-ci.yml (CI=true), resources/env/<env>.yml,
     env vars, CLI options (dotted keys: {"env": "stage", "browser.headless": False})."""
-    environ = os.environ if environ is None else environ
+    env_vars: Mapping[str, str] = os.environ if environ is None else environ
     cli = cli or {}
-    ci = environ.get("CI", "").lower() in ("1", "true", "yes")
+    ci = env_vars.get("CI", "").lower() in ("1", "true", "yes")
     tree = _yaml(ROOT / "config" / "application.yml")
     if ci:
         tree = _merge(tree, _yaml(ROOT / "config" / "application-ci.yml"))
-    env = cli.get("env") or environ.get("TEST_ENV") or tree.get("env", "dev")
+    env = cli.get("env") or env_vars.get("TEST_ENV") or tree.get("env", "dev")
     env_file = ROOT / "resources" / "env" / f"{env}.yml"
     if not env_file.exists():
         raise FileNotFoundError(f"No environment '{env}': {env_file} is missing")
     tree = _merge(tree, _yaml(env_file))
     for var, dotted in ENV_OVERRIDES.items():
-        if environ.get(var):
-            _set(tree, dotted, environ[var])
+        if env_vars.get(var):
+            _set(tree, dotted, env_vars[var])
     for dotted, value in cli.items():
         if value is not None:
             _set(tree, dotted, value)

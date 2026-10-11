@@ -180,8 +180,8 @@ junit.xml` for CI and the TMS.
 ## Code style — the formatter's
 
 `ruff format` (Black style, 100 columns) and `ruff check` (pyflakes, isort, bugbear, pyupgrade,
-naming) — `make check` / `uv run ruff check . && uv run ruff format --check .`. Type hints on public
-functions; `from __future__ import annotations`; docstrings say *why*, in the project's words.
+naming) and `pyright` (standard mode: what a compiler would catch — a None where a str goes, a
+wrong argument) — `make check` runs all three, CI too. Type hints on public functions; `from __future__ import annotations`; docstrings say *why*, in the project's words.
 Blank lines between Arrange / Act / Assert and around each `with check:`. Python edits through
 the editor (Edit tool), never through sed/heredoc scripts on source files.
 

@@ -37,7 +37,7 @@ _SPACES = re.compile(r"[\s ]+")
 def text_of(element: WebElement) -> str:
     """The text a person reads: textContent with whitespace collapsed (&nbsp; too) — unlike
     `.text` not changed by CSS text-transform, and also for a present but hidden element."""
-    return _SPACES.sub(" ", element.get_property("textContent") or "").strip()
+    return _SPACES.sub(" ", str(element.get_property("textContent") or "")).strip()
 
 
 def has_class(element: WebElement, name: str) -> bool:
@@ -101,15 +101,21 @@ class Element:
         """The WebElement now — found again on every call; waits for it to be present."""
         if self._fixed is not None:
             return self._fixed
+        by, using = self._locator()
         return self.waits.until(
-            lambda _: self._context().find_element(self._by, self._using), f"{self} present"
+            lambda _: self._context().find_element(by, using), f"{self} present"
         )
 
     def find_all(self) -> list[WebElement]:
         """Every match now — instant, possibly empty."""
         if self._fixed is not None:
             return [self._fixed]
-        return self._context().find_elements(self._by, self._using)
+        return self._context().find_elements(*self._locator())
+
+    def _locator(self) -> tuple[str, str]:
+        if self._by is None or self._using is None:
+            raise TypeError(f"{self} has no locator (a wrapped element is found already)")
+        return self._by, self._using
 
     # --- building parts
 
@@ -123,7 +129,7 @@ class Element:
         """A WebElement found at run time (a row, an option) as an element of this one."""
         child = (cls or Element)(name=name)
         child._parent, child._fixed, child._owner = self, element, ""
-        return child
+        return child  # type: ignore[return-value]
 
     # --- reading
 

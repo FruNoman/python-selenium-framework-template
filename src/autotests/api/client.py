@@ -139,7 +139,8 @@ class _Session:
         response = self.session.post(
             url,
             data=fields,
-            headers={"Accept": "text/html", "X-Requested-With": None},
+            # None drops the session's header (requests merges per request)
+            headers={"Accept": "text/html", "X-Requested-With": None},  # type: ignore[dict-item]
             allow_redirects=False,
             timeout=self.client.timeout,
         )

@@ -115,7 +115,7 @@ class Input(Element):
 
     def value(self) -> str:
         """The current value — the `value` property, what was typed."""
-        return self.root.get_property("value") or ""
+        return str(self.root.get_property("value") or "")
 
     def error(self) -> str:
         """Text of the visible error linked by aria-errormessage / aria-describedby, "" if none."""
@@ -267,7 +267,7 @@ class RadioGroup(Element):
     @classmethod
     def _value(cls, radio: WebElement) -> str:
         if _is_native(radio):
-            return radio.get_property("value") or ""
+            return str(radio.get_property("value") or "")
         return radio.get_dom_attribute("data-value") or cls._label(radio)
 
     @staticmethod
@@ -356,7 +356,7 @@ class Calendar(Element):
         return self
 
     def value(self) -> str:
-        return self._input().get_property("value") or ""
+        return str(self._input().get_property("value") or "")
 
     def open(self) -> Self:
         if not self._is_native() and not self.is_open():

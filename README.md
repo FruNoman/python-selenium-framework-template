@@ -51,7 +51,7 @@ rm -rf tests/example resources/data/web-form-data.json
 
 Soft assertions: `with check: assert …, "what"` (pytest-check). Known product bugs:
 `@pytest.mark.xfail(strict=True, reason="…")` — runs every time, a fixed bug turns the run red.
-Style: `ruff format` + `ruff check` (`make check`).
+Style: `ruff format` + `ruff check`; types: `pyright` (standard mode, `[tool.pyright]` in pyproject) — all three in `make check`.
 
 ## Run
 
@@ -64,7 +64,7 @@ uv run pytest -n 4                                  # all, 4 browsers in paralle
 uv run pytest tests/example/test_web_form.py::test_submit -n 0 --headed   # watch one
 uv run pytest --browser firefox -n 4
 GRID_URL=http://localhost:4444 uv run pytest --runner grid -n 4
-make check                                          # style, like CI
+make check                                          # style (ruff) and types (pyright), like CI
 ```
 
 Settings in layers, later wins: `config/application.yml` → `config/application-ci.yml` (`CI=true`)

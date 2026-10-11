@@ -240,7 +240,10 @@ class Toasts(Element):
             f"a toast with '{text}' in {self}",
         )
 
-    def wait_gone(self, text: str) -> Self:
+    def wait_gone(self, text: str | None = None) -> Self:
+        """Until no toast reads `text` — or, without one, until the area itself is gone."""
+        if text is None:
+            return super().wait_gone()
         self.waits.until(
             lambda _: all(text not in t for t in self.texts()), f"no toast with '{text}' in {self}"
         )
@@ -456,4 +459,4 @@ class Pagination(Element):
         )
 
     def _snapshot(self) -> str:
-        return self.root.get_property("innerHTML") or ""
+        return str(self.root.get_property("innerHTML") or "")

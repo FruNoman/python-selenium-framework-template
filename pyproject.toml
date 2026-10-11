@@ -16,7 +16,10 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["ruff==0.17.0"]
+dev = [
+    "pyright>=1.1.414",
+    "ruff==0.17.0",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -51,3 +54,10 @@ ignore = ["RUF001", "RUF002", "RUF003"]  # en dashes and arrows in prose are int
 
 [tool.ruff.lint.isort]
 known-first-party = ["autotests"]
+
+[tool.pyright]
+include = ["src", "tests"]
+typeCheckingMode = "standard"
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"

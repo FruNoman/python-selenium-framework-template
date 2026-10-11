@@ -49,7 +49,7 @@ class SelectDropdown(Element):
 
     def selected_value(self) -> str:
         """`value` of the chosen option — what the form submits."""
-        return self.root.get_property("value") or ""
+        return str(self.root.get_property("value") or "")
 
     def options(self) -> list[str]:
         return [text_of(o) for o in Select(self.root).options]
@@ -216,7 +216,7 @@ class AriaDropdown(Element):
 
     def selected(self) -> str:
         """The text in the input — the chosen option's label once one is chosen."""
-        return self._input().get_property("value") or ""
+        return str(self._input().get_property("value") or "")
 
     def options(self) -> list[str]:
         return self.js(self._LISTBOX + " return options.map(label)")

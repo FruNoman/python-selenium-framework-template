@@ -6,7 +6,7 @@ Wait for what *your* action produces, never for time: no time.sleep in pages or 
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TypeVar
+from typing import TypeVar, cast
 
 from selenium.common.exceptions import (
     JavascriptException,
@@ -30,7 +30,7 @@ class Waits:
         self.poll = poll
 
     def until(
-        self, condition: Callable[[WebDriver], T], message: str, timeout: float | None = None
+        self, condition: Callable[[WebDriver], T | None], message: str, timeout: float | None = None
     ) -> T:
         """Until the condition returns something truthy (returned); `message` says what was
         awaited — it is the failure's first line."""
@@ -41,7 +41,8 @@ class Waits:
             ignored_exceptions=IGNORED,
         )
         try:
-            return wait.until(condition)
+            # WebDriverWait returns only a truthy result — never the condition's None
+            return cast(T, wait.until(condition))
         except TimeoutException as e:
             raise TimeoutException(f"Timed out after {wait._timeout}s waiting for {message}") from e
 
