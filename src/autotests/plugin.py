@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pytest_check import check_log
 from selenium.common.exceptions import WebDriverException
 
 from autotests.api.client import ApiClient
@@ -158,6 +159,26 @@ def credentials(test_data_loader: TestDataLoader) -> Callable[[User], Credential
 
 
 @pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_call(item: pytest.Item) -> Iterator[None]:
+    """Keeps the soft checks' failures: pytest-check clears them when it builds the report."""
+    yield
+    item._autotests_checks = list(check_log.get_failures())  # type: ignore[attr-defined]
+
+
+def _failure_line(item: pytest.Item, call: pytest.CallInfo[Any], report: pytest.TestReport) -> str:
+    """The failure's first line. Soft checks failing in an xfail test raise nothing — pytest-check
+    marks the report xfailed — so their first failure is taken from what the call phase kept."""
+    if call.excinfo is not None:
+        lines = str(call.excinfo.value).splitlines()
+        return lines[0] if lines else call.excinfo.typename
+    checks: list[str] = getattr(item, "_autotests_checks", [])
+    if checks:
+        log.info("failed checks:\n%s", "\n".join(checks))
+        return checks[0].splitlines()[0].removeprefix("FAILURE: ")
+    return report.longreprtext.splitlines()[0] if report.longreprtext else "?"
+
+
+@pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[Any]) -> Iterator[None]:
     """A failed test — and a known bug failing as expected (xfail), the proof that it fails
     because of the bug — leaves its browser's evidence."""
@@ -169,7 +190,7 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[Any]) -> 
     if (failed or expected_failure) and isinstance(browser, Browser):
         settings: Settings = item.config._autotests_settings  # type: ignore[attr-defined]
         folder = settings.path(settings.artifacts.dir) / artifacts.folder_name(item.nodeid)
-        failure = str(call.excinfo.value).splitlines()[0] if call.excinfo else "?"
+        failure = _failure_line(item, call, report)
         saved = artifacts.save(browser.driver, folder, item.nodeid, failure)
         _attach_to_html_report(item, report, saved / "screenshot.png", browser)
     if report.when == "call":
