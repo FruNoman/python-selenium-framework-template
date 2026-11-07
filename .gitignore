@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .ruff_cache/
+.env
 .env.local
 .claude/scratch/
 .claude/settings.local.json
