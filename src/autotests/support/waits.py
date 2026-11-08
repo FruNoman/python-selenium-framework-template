@@ -50,7 +50,8 @@ class Waits:
         self, action: Callable[[], object], message: str = "a new document"
     ) -> None:
         """Runs the action (a submit, a link) and returns once another document replaced this one
-        and finished loading — also when the URL stays the same (a form drawn again with errors)."""
+        and its DOM is ready (page load strategy eager) — also when the URL stays the same (a form
+        drawn again with errors); the page then waits for its own content."""
         self.driver.execute_script("window.__autotestsDocument = true")
         action()
 
@@ -58,7 +59,7 @@ class Waits:
             try:
                 return (
                     driver.execute_script("return window.__autotestsDocument !== true")
-                    and driver.execute_script("return document.readyState") == "complete"
+                    and driver.execute_script("return document.readyState") != "loading"
                 )
             except (JavascriptException, WebDriverException):
                 return False  # mid-navigation
