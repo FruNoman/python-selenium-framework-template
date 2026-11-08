@@ -8,31 +8,18 @@ never a dict built field by field.
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any, TypeVar
 
 import requests
 from pydantic import BaseModel
 
+from autotests.api.log import log_calls
 from autotests.auth.users import User
 
 log = logging.getLogger(__name__)
 
 M = TypeVar("M", bound=BaseModel)
-
-_SECRET_KEYS = ("password", "token", "secret", "authorization", "cookie")
-
-
-def _masked(body: Any) -> Any:
-    if isinstance(body, dict):
-        return {
-            k: "***" if any(s in k.lower() for s in _SECRET_KEYS) else _masked(v)
-            for k, v in body.items()
-        }
-    if isinstance(body, list):
-        return [_masked(v) for v in body]
-    return body
 
 
 class ApiResponse:
@@ -75,7 +62,7 @@ class ApiClient:
         self.timeout = timeout
 
     def as_user(self, user: User | None = None) -> _Session:
-        session = requests.Session()
+        session = log_calls(requests.Session())
         session.headers["Accept"] = "application/json"
         if user is not None:
             self.authenticate(session, user)
@@ -107,13 +94,6 @@ class _Session:
         response = self.session.request(
             method, url, json=payload, params=params, timeout=self.client.timeout, **kwargs
         )
-        log.info(
-            "%s %s%s → %s",
-            method,
-            url,
-            f" {json.dumps(_masked(payload))[:300]}" if payload is not None else "",
-            response.status_code,
-        )
         return ApiResponse(response)
 
     def get(self, path: str, **kwargs: Any) -> ApiResponse:
@@ -133,8 +113,7 @@ class _Session:
 
     def post_form(self, path: str, fields: list[tuple[str, str]]) -> ApiResponse:
         """A server-rendered form submitted as the browser submits it (`api.forms`): urlencoded,
-        no XHR headers, the redirect returned as the answer. Only the field count is logged — a
-        form carries tokens and personal data."""
+        no XHR headers, the redirect returned as the answer. Logged as `form:` lines (api/log)."""
         url = self.client.base_url + path.lstrip("/")
         response = self.session.post(
             url,
@@ -144,7 +123,6 @@ class _Session:
             allow_redirects=False,
             timeout=self.client.timeout,
         )
-        log.info("POST %s (form, %d fields) → %s", url, len(fields), response.status_code)
         return ApiResponse(response)
 
 
@@ -154,12 +132,11 @@ class WebClient:
     def __init__(self, base_url: str, timeout: float = 30) -> None:
         self.base_url = base_url.rstrip("/") + "/"
         self.timeout = timeout
-        self.session = requests.Session()
+        self.session = log_calls(requests.Session())
 
     def get(self, path: str, **kwargs: Any) -> ApiResponse:
         url = path if path.startswith("http") else self.base_url + path.lstrip("/")
         response = self.session.get(url, allow_redirects=False, timeout=self.timeout, **kwargs)
-        log.info("GET %s → %s", url, response.status_code)
         return ApiResponse(response)
 
     def post_form(self, path: str, form: dict[str, str], **kwargs: Any) -> ApiResponse:
@@ -167,5 +144,4 @@ class WebClient:
         response = self.session.post(
             url, data=form, allow_redirects=False, timeout=self.timeout, **kwargs
         )
-        log.info("POST %s → %s", url, response.status_code)
         return ApiResponse(response)
