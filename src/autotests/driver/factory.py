@@ -17,6 +17,12 @@ from autotests.config.settings import Settings
 log = logging.getLogger(__name__)
 
 
+# _EAGER: navigation returns once the DOM is ready, not after every resource — a heavy page whose
+# icon font or tracker kept the load event pending timed the renderer out (~57 s) while it was
+# already drawn (lab18, Lightning Step, 2026-11-08: 13 times in one batch). Pages wait for their
+# own content (is_loaded), so nothing relies on the load event.
+
+
 def _chrome_options(settings: Settings) -> webdriver.ChromeOptions:
     options = webdriver.ChromeOptions()
     if settings.browser.headless:
@@ -26,6 +32,7 @@ def _chrome_options(settings: Settings) -> webdriver.ChromeOptions:
     options.add_argument("--disable-search-engine-choice-screen")
     # the browser console for failure artifacts
     options.set_capability("goog:loggingPrefs", {"browser": "ALL"})
+    options.page_load_strategy = "eager"  # see _EAGER
     return options
 
 
@@ -40,6 +47,7 @@ def _firefox_options(settings: Settings) -> webdriver.FirefoxOptions:
     # Grid the nodes need SE_NODE_GRID_URL set to the URL clients use (docker-compose.grid.yml),
     # or the session's webSocketUrl points at the hub's container IP
     options.enable_bidi = True
+    options.page_load_strategy = "eager"  # see _EAGER
     return options
 
 

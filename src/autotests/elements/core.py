@@ -136,7 +136,8 @@ class Element:
     def is_present(self) -> bool:
         """In the DOM right now — instant: for optional parts (a pager absent without results)."""
         try:
-            return bool(self.find_all()) and self._alive(self.find_all()[0])
+            found = self.find_all()  # once: the element may go between two calls (IndexError)
+            return bool(found) and self._alive(found[0])
         except (NoSuchElementException, StaleElementReferenceException):
             return False
 
