@@ -141,7 +141,7 @@ A package past ~10 modules splits by area; a module past ~500 lines splits by sc
   `.env.local`.
 - API: `api/<area>/<x>_api.py` takes the request DTO (pydantic, `model_dump(by_alias=True)`) and
   returns parsed responses (`ApiResponse.expect_status(201).as_model(OrderResponse)`) — never a
-  dict built field by field; bodies logged with secrets masked. `api.as_user(user)` — ONBOARD
+  dict built field by field. Every HTTP call (ApiClient, WebClient) is logged as one block by `api/log.py` (logger `api`) — the Java templates' layout: `____` lines, `REQUEST: METHOD URL`, headers, `form:` lines, pretty body, `RESPONSE: status (ms)`, headers, body; credential headers and password/secret/token fields masked, bodies cut at 20 000. `api.as_user(user)` — ONBOARD
   the app's auth. `WebClient` for plain HTTP to the web app (redirects are answers).
 - Preconditions through the API, not through other screens: a fixture creates, `yield`s, and
   deletes in `finally` — also when the test fails. Keep the id as soon as the app hands it out
