@@ -71,7 +71,8 @@ def test_placeholders_give_fresh_values() -> None:
     with check:
         assert values[0] != values[1], "uniqueTimestamp never twice"
     with check:
-        assert len(values[2]) == 6 and values[2][0] != "0", "random:N — N digits, no leading 0"
+        assert len(values[2]) == 6, "random:N — N digits, no leading 0"
+        assert values[2][0] != "0", "random:N — N digits, no leading 0"
     with check:
         assert len(values[3]) == 12, "text:N"
     with check:
@@ -105,7 +106,8 @@ def test_variants_env_overrides_and_masked_secrets(tmp_path: Path) -> None:
     with check:
         assert admin.born == dt.date(1815, 12, 10), "a date parsed"
     with check:
-        assert "s3cret" not in repr(admin) and "s3cret" not in str(admin.password), "secret hidden"
+        assert "s3cret" not in repr(admin), "secret hidden"
+        assert "s3cret" not in str(admin.password), "secret hidden"
     with check:
         assert loader.variant_names(SampleData) == ["default", "admin"], "the env file's variants"
 
@@ -153,7 +155,8 @@ def test_api_client_sends_dtos_and_masks_secrets(
     with check:
         assert response.as_model(Login).username == "ada", "the DTO round trip (camelCase JSON)"
     with check:
-        assert "s3cret" not in caplog.text and "POST" in caplog.text, "logged, password masked"
+        assert "s3cret" not in caplog.text, "logged, password masked"
+        assert "POST" in caplog.text, "logged, password masked"
     with pytest.raises(AssertionError, match="→ 201, expected"):
         response.expect_status(200)
 
@@ -193,4 +196,5 @@ def test_shared_state_joins_its_state_and_switches_once_the_other_is_done(
     with check:
         assert events.index("other switches") > events.index("first ends"), "waits for the holders"
     with check:
-        assert resource["on"] is False and events.count("other switches") == 1, "switched once"
+        assert resource["on"] is False, "switched once"
+        assert events.count("other switches") == 1, "switched once"

@@ -37,17 +37,21 @@ def test_a_json_call_is_one_block_with_secrets_masked() -> None:
     lines = block.splitlines()
 
     with check:
-        assert lines[1] == SEPARATOR and lines[-1] == SEPARATOR, "between ____ lines"
+        assert lines[1] == SEPARATOR, "between ____ lines"
+        assert lines[-1] == SEPARATOR, "between ____ lines"
     with check:
         assert "REQUEST: POST https://app.example/api/orders" in lines
     with check:
-        assert "Authorization: ***" in lines and "Accept: application/json" in lines
+        assert "Authorization: ***" in lines
+        assert "Accept: application/json" in lines
     with check:
-        assert '    "password": "***"' in lines and '    "sku": "A-1",' in lines, "pretty, masked"
+        assert '    "password": "***"' in lines, "pretty, masked"
+        assert '    "sku": "A-1",' in lines, "pretty, masked"
     with check:
         assert "RESPONSE: 201 (42 ms)" in lines
     with check:
-        assert "Set-Cookie: ***" in lines and '    "token": "***"' in lines
+        assert "Set-Cookie: ***" in lines
+        assert '    "token": "***"' in lines
 
 
 def test_a_form_post_is_logged_as_form_lines() -> None:
@@ -66,6 +70,8 @@ def test_a_form_post_is_logged_as_form_lines() -> None:
     with check:
         assert "form: email=a@b.c" in lines
     with check:
-        assert "form: password=***" in lines and "form: _token=***" in lines
+        assert "form: password=***" in lines
+        assert "form: _token=***" in lines
     with check:
-        assert "RESPONSE: 302 (42 ms)" in lines and "Location: /home" in lines
+        assert "RESPONSE: 302 (42 ms)" in lines
+        assert "Location: /home" in lines

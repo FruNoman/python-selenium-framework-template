@@ -55,12 +55,17 @@ target-version = "py312"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "UP", "SIM", "N", "RUF"]
+select = [
+    "E", "F", "W", "I", "B", "UP", "SIM", "N", "RUF",
+    # code-style refactoring: comprehensions, commented-out code, perf, returns, misc, pathlib,
+    # complexity, pytest style, unused arguments
+    "C4", "ERA", "PERF", "RET", "PIE", "PTH", "C90", "PT", "ARG",
+]
 ignore = ["RUF001", "RUF002", "RUF003"]  # en dashes and arrows in prose are intended
 
 [tool.ruff.lint.per-file-ignores]
 # test names carry the TMS case id as is: test_LS316_…, test_C123_…
-"tests/**" = ["N802"]
+"tests/**" = ["N802", "ARG"]  # fixtures requested for their side effect are the pytest norm
 
 [tool.ruff.lint.isort]
 known-first-party = ["autotests"]

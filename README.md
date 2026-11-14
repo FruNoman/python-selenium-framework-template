@@ -51,7 +51,7 @@ rm -rf tests/example resources/data/web-form-data.json
 
 Soft assertions: `with check: assert …, "what"` (pytest-check). Known product bugs:
 `@pytest.mark.xfail(strict=True, reason="…")` — runs every time, a fixed bug turns the run red.
-Style: `ruff format` + `ruff check`; types: `pyright` (standard mode, `[tool.pyright]` in pyproject) — all three in `make check`.
+Style: `ruff format` + `ruff check` (PEP 8, isort, bugbear, pyupgrade, simplify, naming, comprehensions, commented-out code, perf, returns, pathlib, complexity, pytest style, unused arguments in `src/`); types: `pyright` (standard mode, `[tool.pyright]` in pyproject) — all three in `make check`. `make hooks` once per clone turns on the pre-commit style gate (`.githooks/pre-commit`).
 
 ## Run
 
@@ -65,6 +65,7 @@ uv run pytest tests/example/test_web_form.py::test_submit -n 0 --headed   # watc
 uv run pytest --browser firefox -n 4
 GRID_URL=http://localhost:4444 uv run pytest --runner grid -n 4
 make check                                          # style (ruff) and types (pyright), like CI
+make hooks                                          # once per clone: style gate before every commit
 ```
 
 Settings in layers, later wins: `config/application.yml` → `config/application-ci.yml` (`CI=true`)

@@ -38,7 +38,7 @@ def log_calls(session: requests.Session) -> requests.Session:
     return session
 
 
-def _hook(response: requests.Response, *args: Any, **kwargs: Any) -> requests.Response:
+def _hook(response: requests.Response, *_args: Any, **_kwargs: Any) -> requests.Response:
     log.info(entry(response))
     return response
 
