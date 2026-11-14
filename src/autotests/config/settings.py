@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -44,11 +44,19 @@ class BaseSettings(_Frozen):
     url: str
 
 
+class AuthSettings(_Frozen):
+    """How the app keeps a session: the name of the cookie its login sets (`walk-session.sh`
+    prints it, the tests' login injects it)."""
+
+    session_cookie: str = Field(alias="session-cookie")
+
+
 class Settings(_Frozen):
     env: str = "dev"
     runner: Literal["local", "grid"] = "local"
     ci: bool = False
     base: BaseSettings
+    auth: AuthSettings | None = None
     browser: BrowserSettings = BrowserSettings()
     grid: GridSettings = GridSettings()
     waits: WaitSettings = WaitSettings()

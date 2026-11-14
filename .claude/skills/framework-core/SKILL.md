@@ -45,7 +45,8 @@ Layers, later wins: `config/application.yml` → `config/application-ci.yml` (`C
 `resources/env/<env>.yml` (`--env` / `TEST_ENV`, default `dev`) → env vars (`BASE_URL`, `RUNNER`,
 `BROWSER`, `HEADLESS`, `GRID_URL`, `WAITS_TIMEOUT`) → options (`--env`, `--runner`, `--browser`,
 `--headed`). One frozen `Settings` per run (the `settings` fixture); nothing else reads
-`os.environ`. An env file holds URLs and non-secret per-env settings; logins are test data.
+`os.environ`. An env file holds URLs and non-secret per-env settings (`auth.session-cookie` —
+the cookie the app's login sets, read by `scripts/walk-session.sh`); logins are test data.
 
 ## Pages
 

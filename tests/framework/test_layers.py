@@ -15,7 +15,7 @@ from pydantic import SecretStr
 from pytest_check import check
 
 from autotests.api.client import ApiClient
-from autotests.config.settings import load_settings
+from autotests.config.settings import Settings, load_settings
 from autotests.data.loader import TestDataLoader
 from autotests.data.models import TestData
 from autotests.data.placeholders import process
@@ -36,6 +36,15 @@ def test_settings_layers_env_vars_and_options() -> None:
         assert (from_cli.browser.name, from_cli.runner) == ("firefox", "grid"), "CLI options"
     with check:
         assert load_settings(environ={"CI": "true"}).waits.timeout == 20, "the CI layer"
+
+
+def test_an_env_file_may_name_the_session_cookie() -> None:
+    settings = Settings.model_validate(
+        {"base": {"url": "https://app.example/"}, "auth": {"session-cookie": "sid"}}
+    )
+
+    assert settings.auth is not None, "the auth section is a known key"
+    assert settings.auth.session_cookie == "sid", "auth.session-cookie, as walk-session.sh reads it"
 
 
 def test_an_unknown_environment_fails_fast() -> None:

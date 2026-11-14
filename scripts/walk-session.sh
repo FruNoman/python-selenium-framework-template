@@ -15,7 +15,7 @@
 #   curl -s -o /dev/null -c "$JAR" -b "$JAR" --data-urlencode "_token=$TOKEN" \
 #     --data-urlencode "email=$(field username)" --data-urlencode "password=$(field password)" \
 #     "$BASE/auth/login"
-#   curl -s -o /dev/null -c "$JAR" -b "$JAR" "$BASE/home"
+# Then write the page the login lands on into PROTECTED below — the check after the login uses it.
 # A token in localStorage instead of a cookie: print "<key>=<token>" and say so in the site map.
 set -euo pipefail
 USER_KEY=${1:?usage: walk-session.sh <user-key> [env]}
@@ -34,6 +34,13 @@ JAR=$(mktemp); trap 'rm -f "$JAR"' EXIT
 
 echo "walk-session.sh: the app's login isn't written yet (ONBOARD)" >&2
 exit 1
+
+# The login worked only if a page for logged-in users answers 200, not a redirect to the login:
+# some frameworks set a session cookie on every answer, logged in or not, so the cookie alone
+# proves nothing. ONBOARD: a page only a logged-in user gets (relative to base.url).
+PROTECTED=home
+CODE=$(curl -s -o /dev/null -w '%{http_code}' -c "$JAR" -b "$JAR" "$BASE/$PROTECTED")
+[ "$CODE" = 200 ] || { echo "login of $USER_KEY failed: /$PROTECTED -> $CODE" >&2; exit 1; }
 
 VALUE=$(awk -v c="$COOKIE" '$6==c{print $7}' "$JAR")
 [ -n "$VALUE" ] || { echo "no $COOKIE cookie after the login" >&2; exit 1; }
