@@ -43,9 +43,9 @@ def test_choices(web_form_page: WebFormPage, web_form_data: WebFormData) -> None
     with check:
         assert web_form_page.radio() == web_form_data.radio, "radio by its label"
     with check:
-        assert web_form_page.radio_options() == web_form_data.radios
+        assert web_form_page.radio_options() == web_form_data.radios, "the radio options"
     with check:
-        assert web_form_page.uploaded_files() == [web_form_data.file_name]
+        assert web_form_page.uploaded_files() == [web_form_data.file_name], "the uploaded file"
 
 
 def test_an_option_the_select_doesnt_have_is_refused(

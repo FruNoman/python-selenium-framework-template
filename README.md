@@ -64,7 +64,7 @@ uv run pytest -n 4                                  # all, 4 browsers in paralle
 uv run pytest tests/example/test_web_form.py::test_submit -n 0 --headed   # watch one
 uv run pytest --browser firefox -n 4
 GRID_URL=http://localhost:4444 uv run pytest --runner grid -n 4
-make check                                          # style (ruff) and types (pyright), like CI
+make check                                          # style (ruff) and types (pyright), like CI + scripts/audit.py (the framework's own rules)
 make hooks                                          # once per clone: style gate before every commit
 ```
 
