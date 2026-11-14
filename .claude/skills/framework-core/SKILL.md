@@ -181,6 +181,13 @@ junit.xml` for CI and the TMS.
   turns the run **red** (XPASS, `xfail_strict = true`) — drop the marker then. Never `skip` it,
   never loosen the assertion. Prove it before marking: run it, read the artifacts — it must fail on
   the bug, not on a locator or data.
+  **Scope it to the check the bug breaks**: `with known_bug("<KEY>: <why>"):` (`autotests.known_bug`)
+  around that check only, inside the test — the block failing (an assert, a soft check, a wait) is
+  XFAIL with the reason (failure artifacts too) and the test stops there; the checks before it
+  still count (one failed = red); the block passing is red, "known bug <KEY> no longer reproduces —
+  remove the mark"; any failure outside the block stays red. The whole-test
+  `xfail(strict=True)` only when the bug blocks the test's start (its entry page, its
+  precondition) — otherwise it hides every other check of the case.
 - **A test module holds only tests** (and its imports): fixtures in conftest.py, flows tests repeat
   as preconditions in `tests/steps/<area>.py` (complete actions of the positive flow ending in a
   stable state, named verb + object — `create_order`), a step checks with a plain `assert`.

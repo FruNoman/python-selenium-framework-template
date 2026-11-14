@@ -49,8 +49,10 @@ only, removed right after cloning:
 rm -rf tests/example resources/data/web-form-data.json
 ```
 
-Soft assertions: `with check: assert …, "what"` (pytest-check). Known product bugs:
-`@pytest.mark.xfail(strict=True, reason="…")` — runs every time, a fixed bug turns the run red.
+Soft assertions: `with check: assert …, "what"` (pytest-check). Known product bugs: `with
+known_bug("<KEY>: <why>"):` around the one check the bug breaks (XFAIL while it reproduces, red
+once it doesn't); `@pytest.mark.xfail(strict=True, reason="…")` only when the bug blocks the
+test's start — both run every time, a fixed bug turns the run red.
 Style: `ruff format` + `ruff check` (PEP 8, isort, bugbear, pyupgrade, simplify, naming, comprehensions, commented-out code, perf, returns, pathlib, complexity, pytest style, unused arguments in `src/`); types: `pyright` (standard mode, `[tool.pyright]` in pyproject) — all three in `make check`. `make hooks` once per clone turns on the pre-commit style gate (`.githooks/pre-commit`).
 
 ## Run
