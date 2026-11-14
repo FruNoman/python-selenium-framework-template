@@ -68,6 +68,11 @@ the cookie the app's login sets, read by `scripts/walk-session.sh`); logins are 
 - A page is named after its class: `web_form_page`, `orders_page` — never `page`, `form`.
 - An action that loads a new document waits for it: `self.waits.for_new_document(self._save.click)`
   — also when the URL stays the same (a form drawn again with errors).
+- What every page of the logged-in app shows (the header, the user menu) lives in the app's base
+  page `pages/app_page.py` (`AppPage(BasePage)`, the app's pages extend it). Each header / user
+  menu action calls `self.wait_scripts_loaded()` first (`document.readyState == "complete"`,
+  page-load timeout): the menu's widget is bound by the page's late scripts, and a slow app
+  ignores a click before that.
 
 ## Elements
 

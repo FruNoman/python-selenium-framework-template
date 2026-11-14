@@ -69,6 +69,13 @@ class BasePage:
         self.waits.until(lambda _: self.is_loaded(), f"{type(self).__name__} loaded")
         return self
 
+    def wait_scripts_loaded(self) -> Self:
+        """Before an action on what every page's scripts bind (the header, the user menu): until
+        the document is complete, within the page-load timeout — a slow app ignores an early
+        click. The app's base page (`AppPage`) calls it first in each header action."""
+        self.waits.for_scripts_loaded(self.settings.waits.page_load)
+        return self
+
     def element(self, by: str, value: str, name: str, cls: type[E] = Element) -> E:
         """An element found at run time by a locator built then (a row by its text)."""
         element = cls(by, value, name)
