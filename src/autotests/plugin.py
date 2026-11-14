@@ -149,7 +149,7 @@ def user(request: pytest.FixtureRequest) -> User:
 def authenticate() -> Callable[[Browser, User], None]:
     """ONBOARD: log the browser in as the user without the login form (a session cookie or a
     token injected — the login-strategies skill); until then tests start logged out."""
-    return lambda browser, user: None
+    return lambda _browser, _user: None
 
 
 @pytest.fixture(scope="session")

@@ -1,0 +1,7 @@
+#!/bin/sh
+# Style gate before a commit (enable once: make hooks). Checks only the staged Python files with
+# the project's pinned ruff; fix with `make format`, then stage again. Skip once: git commit --no-verify.
+files=$(git diff --cached --name-only --diff-filter=ACMR -- '*.py')
+[ -z "$files" ] && exit 0
+echo "$files" | xargs uv run ruff check --quiet || { echo "pre-commit: ruff check failed — run: make format"; exit 1; }
+echo "$files" | xargs uv run ruff format --check --quiet || { echo "pre-commit: not formatted — run: make format"; exit 1; }
