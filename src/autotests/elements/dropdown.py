@@ -390,7 +390,7 @@ class ReactSelectDropdown(Element):
     def search(self, text: str, at_once: bool = False) -> Self:
         """Types `text` into the search. `at_once`: all but the last character arrive as one input
         event, the last one typed — for an async search that asks the server on every keystroke
-        and refuses a burst of them (429; Lightning Step's allergen search, 2026-10-11)."""
+        and refuses a burst of them (429)."""
         self.open()
         field = self._input()
         if at_once and len(text) > 1:
@@ -412,7 +412,7 @@ class ReactSelectDropdown(Element):
         """Picks the option `text`; done when the control shows `shown` — the option's own text
         unless it reads otherwise once chosen (a creatable option `Select "X" for Allergy?` shows
         "X"). `timeout`: how long the option may take to be offered — an async search under load
-        took over 10 s (Lightning Step, 2026-10-11). A click the "Loading…" overlay takes is
+        can take over 10 s. A click the "Loading…" overlay takes is
         repeated until the choice shows."""
         self.open()
         literal = f'"{text}"' if '"' not in text else f"'{text}'"

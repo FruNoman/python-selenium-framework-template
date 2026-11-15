@@ -19,7 +19,7 @@ log = logging.getLogger(__name__)
 
 # _EAGER: navigation returns once the DOM is ready, not after every resource — a heavy page whose
 # icon font or tracker kept the load event pending timed the renderer out (~57 s) while it was
-# already drawn (lab18, Lightning Step, 2026-11-08: 13 times in one batch). Pages wait for their
+# already drawn. Pages wait for their
 # own content (is_loaded), so nothing relies on the load event.
 
 
