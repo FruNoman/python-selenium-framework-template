@@ -38,6 +38,7 @@ for known bugs. The test-data JSON (placeholders, camelCase keys) reads the same
 | `autotests/api/` | `ApiClient` (requests, DTOs in and out, secrets masked in the log; ONBOARD: auth; `post_form` for server-rendered forms), `forms.py` (`form_fields(html, form_id)` — what a browser would post — + `with_values`), `WebClient` (plain HTTP, redirects are answers) |
 | `autotests/testdata/` | functions building what tests create through the API, one module per area; the fixture that calls one yields and deletes in `finally` |
 | `autotests/auth/` | `User` (least privileged first), `Credentials` (from `resources/data/user-data.json`) |
+| `autotests/step.py` | `with step("<what the user does>"):` around each case step (or `@step("…")` on a page method) — `STEP <n>: …` in the test's log, the steps in the HTML report, the failed step in the failure's info |
 | `autotests/plugin.py` | the pytest plugin: options, `settings`, `browser`, `user`, `authenticate`, data/texts/api fixtures, the rarer shared state collected first, logs per test, artifacts on failure and xfail (screenshot in the HTML report), a timeout per test |
 
 Tests: `tests/framework` (the wiring on about:blank — no app or network needed; a project drops

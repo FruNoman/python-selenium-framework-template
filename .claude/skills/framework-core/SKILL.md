@@ -193,6 +193,11 @@ junit.xml` for CI and the TMS.
   stable state, named verb + object — `create_order`), a step checks with a plain `assert`.
 - Steps a case repeats from another automated case are its precondition: done through a fixture
   or a step, not checked again.
+- **The case's steps in the report**: `with step("<what the user does>"):` (`autotests.step`)
+  around each step of the case, its checks inside — the test's log gets `STEP <n>: …`, the HTML
+  report the list of steps (✔ / ✘ / ✘ check), the failure's `info.txt` "(at STEP <n>: …)". A page
+  method may be a step too (`@step("Sign in")`, numbered `<n>.<m>` inside the test's step). The
+  title is the case step's action, not the code's (`"Save the order"`, not `"click #save"`).
 - **Parallel = processes** (`-n N`, pytest-xdist): no shared state between tests anyway; a value
   that must be unique across workers: `{{uniqueTimestamp}}` (carries the worker number). A resource
   of the environment several tests switch (a feature flag): a file lock per resource, not a module

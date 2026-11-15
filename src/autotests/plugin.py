@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import base64
 import contextlib
+import html
 import logging
 from collections import Counter
 from collections.abc import Callable, Iterator
@@ -27,6 +28,7 @@ import pytest
 from pytest_check import check_log
 from selenium.common.exceptions import WebDriverException
 
+from autotests import step as test_steps
 from autotests.api.client import ApiClient
 from autotests.auth.users import Credentials, User
 from autotests.config.settings import Settings, load_settings
@@ -94,7 +96,8 @@ def settings(pytestconfig: pytest.Config) -> Settings:
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_setup(item: pytest.Item) -> Iterator[None]:
-    """One log file per test: <logs.dir>/tests/<test>.log."""
+    """One log file per test: <logs.dir>/tests/<test>.log; the test's steps start from 1."""
+    test_steps.reset()
     settings: Settings = item.config._autotests_settings  # type: ignore[attr-defined]
     folder = settings.path(settings.logs.dir) / "tests"
     folder.mkdir(parents=True, exist_ok=True)
@@ -191,9 +194,13 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[Any]) -> 
         settings: Settings = item.config._autotests_settings  # type: ignore[attr-defined]
         folder = settings.path(settings.artifacts.dir) / artifacts.folder_name(item.nodeid)
         failure = _failure_line(item, call, report)
+        broken = test_steps.failed()
+        if broken is not None:
+            failure = f"{failure} (at STEP {broken.number}: {broken.title})"
         saved = artifacts.save(browser.driver, folder, item.nodeid, failure)
         _attach_to_html_report(item, report, saved / "screenshot.png", browser)
     if report.when == "call":
+        _steps_to_html_report(item, report)
         log.info(
             "%s %s (%.1f s)",
             "✔" if report.passed else "✘ XFAIL" if hasattr(report, "wasxfail") else "✘ FAIL",
@@ -216,6 +223,26 @@ def _attach_to_html_report(
         extras.append(html_extras.url(browser.driver.current_url))
     if screenshot.exists():
         extras.append(html_extras.png(base64.b64encode(screenshot.read_bytes()).decode()))
+    report.extras = extras  # type: ignore[attr-defined] — pytest-html reads it
+
+
+def _steps_to_html_report(item: pytest.Item, report: pytest.TestReport) -> None:
+    """The test's steps (`autotests.step`) as a list in its row of the HTML report — which one
+    broke shows without opening the log."""
+    taken = test_steps.taken()
+    if not taken or item.config.pluginmanager.getplugin("html") is None:
+        return
+    from pytest_html import extras as html_extras
+
+    marks = {"passed": "✔", "failed": "✘", "check failed": "✘ check", "running": "…"}
+    rows = "".join(
+        f"<li>{marks[s.status]} STEP {s.number}: {html.escape(s.title)} ({s.seconds:.1f} s)"
+        + (f" — {html.escape(s.error)}" if s.error else "")
+        + "</li>"
+        for s in taken
+    )
+    extras = getattr(report, "extras", [])
+    extras.append(html_extras.html(f'<ul class="autotests-steps">{rows}</ul>'))
     report.extras = extras  # type: ignore[attr-defined] — pytest-html reads it
 
 
