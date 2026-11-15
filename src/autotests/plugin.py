@@ -33,6 +33,7 @@ from autotests.api.client import ApiClient
 from autotests.auth.users import Credentials, User
 from autotests.config.settings import Settings, load_settings
 from autotests.data.loader import TestDataLoader
+from autotests.data.texts import load_ui_texts
 from autotests.driver.factory import create_driver
 from autotests.pages.base_page import Browser
 from autotests.support import artifacts, shared_state
@@ -268,11 +269,8 @@ def test_data_loader(settings: Settings) -> TestDataLoader:
 
 @pytest.fixture(scope="session")
 def ui_texts(settings: Settings) -> dict[str, Any]:
-    """resources/data/ui-texts.json → its "default" variant: area → texts."""
-    import json
-
-    path = settings.path(settings.data.dir) / "ui-texts.json"
-    return json.loads(path.read_text())["default"] if path.exists() else {}
+    """resources/data/ui-texts.json ("default" variant) + ui-texts/<area>.json: area → texts."""
+    return load_ui_texts(settings.path(settings.data.dir))
 
 
 # --- shared state

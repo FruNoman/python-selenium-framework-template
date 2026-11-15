@@ -20,6 +20,7 @@ from autotests.config.settings import ROOT, Settings, load_settings
 from autotests.data.loader import TestDataLoader
 from autotests.data.models import TestData
 from autotests.data.placeholders import process
+from autotests.data.texts import load_ui_texts
 from autotests.support import shared_state
 
 # --- settings
@@ -123,6 +124,20 @@ def test_variants_env_overrides_and_masked_secrets(tmp_path: Path) -> None:
         assert "s3cret" not in str(admin.password), "secret hidden"
     with check:
         assert loader.variant_names(SampleData) == ["default", "admin"], "the env file's variants"
+
+
+def test_ui_texts_merge_the_single_file_and_a_file_per_area(tmp_path: Path) -> None:
+    (tmp_path / "ui-texts").mkdir()
+    (tmp_path / "ui-texts.json").write_text(json.dumps({"default": {"orders": {"saved": "Saved"}}}))
+    (tmp_path / "ui-texts" / "login.json").write_text(json.dumps({"welcome": "Hi"}))
+
+    texts = load_ui_texts(tmp_path)
+
+    with check:
+        assert texts == {"orders": {"saved": "Saved"}, "login": {"welcome": "Hi"}}, "merged"
+    (tmp_path / "ui-texts" / "orders.json").write_text(json.dumps({"saved": "Done"}))
+    with pytest.raises(ValueError, match="'orders' is defined twice"):
+        load_ui_texts(tmp_path)
 
 
 # --- API

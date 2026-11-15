@@ -46,7 +46,9 @@ def texts_fixture[T: UiTexts](model: type[T]) -> Callable[..., T]:
     @pytest.fixture(scope="session")
     def fixture(ui_texts: dict[str, Any]) -> T:
         if model.area not in ui_texts:
-            raise KeyError(f"No area '{model.area}' in ui-texts.json: {list(ui_texts)}")
+            raise KeyError(
+                f"No area '{model.area}' in ui-texts.json or ui-texts/: {list(ui_texts)}"
+            )
         return model.model_validate(ui_texts[model.area])
 
     fixture.__doc__ = f"{model.__name__}: ui-texts.json area '{model.area}'"

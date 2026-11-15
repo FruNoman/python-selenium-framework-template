@@ -141,6 +141,9 @@ A package past ~10 modules splits by area; a module past ~500 lines splits by sc
   name. The app's texts: `ui-texts.json`, one typed model per area in `data/texts.py`
   (`class OrdersTexts(UiTexts)`, its `area` key) → `orders_texts = texts_fixture(OrdersTexts)`; a
   test annotates `orders_texts: OrdersTexts` — pyright checks every name.
+  An area may live in a file of its own, `resources/data/ui-texts/<area>.json` (the area's texts,
+  without the `default`/area wrapping) — the loader merges it with `ui-texts.json`, an area in both
+  is an error. New areas get their own file: parallel branches then never conflict on one JSON.
 - **What goes to data files**: what varies — per environment, per variant, per user, generated
   (unique, dates) — and the app's texts. A value one test uses once and that changes with nothing
   (a count, a fixed option of the case) may stay a named constant or a literal in the test.
