@@ -39,12 +39,17 @@ def test_standard_elements_cope_with_react_rerenders(browser: Browser) -> None:
     react_quirks_page.box.check()
     checked = react_quirks_page.box.is_checked()
 
+    react_quirks_page.size.select("Large")
+    size = react_quirks_page.size.selected()
+
     with check:
         assert quantity == "3", "type_kept: the field drawn again keeps the text"
     with check:
         assert step != "Define", "click_until: the ignored first click clicked again"
     with check:
         assert checked, "a 0 px checkbox checked through its cell"
+    with check:
+        assert size == "Large", "a 0 px radio selected through its label"
 
 
 def test_failure_artifacts_capture_the_browser(browser: Browser, tmp_path: Path) -> None:

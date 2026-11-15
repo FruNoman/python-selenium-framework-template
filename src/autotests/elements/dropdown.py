@@ -458,19 +458,29 @@ class ReactSelectDropdown(Element):
 
 
 class Select2Dropdown(AriaDropdown):
-    """select2 4.x (jQuery): declared on the hidden `<select>` it replaces (`By.ID, "dx_id"`). The
-    widget is the `span.select2` next to it — a `[role=combobox]` whose `aria-owns` names the
-    listbox (`ul#select2-<id>-results`, in <body>) while open; the search box is a separate
-    `.select2-search__field` in the open dropdown (hidden for short lists); the choice shows in
-    `#select2-<id>-container`. Every option is picked with a real click. Lightning Step, 2026-10-11.
-    """
+    """select2 4.x (jQuery): declared on the hidden `<select>` it replaces (`By.ID, "dx_id"` — the
+    select needs its id). The widget is found by that id, not by its place in the DOM (a wrapper's
+    span may sit between the select and the widget): the selection is the
+    `[aria-labelledby="select2-<id>-container"]` element (else the one holding
+    `#select2-<id>-container`, else — a 4.0 multiple select, with neither — the select2 instance's
+    own `$selection`), the options are in `ul#select2-<id>-results` (in <body>) while
+    open, the search box is the open dropdown's `.select2-search__field` (hidden for short lists)
+    or, on a multiple select, the inline one in the selection. Every option is picked with a real
+    click. A multiple select: `choose(*items)` adds options, `chosen()` reads them all."""
 
     _LISTBOX = (
-        "const input = arguments[0].nextElementSibling.querySelector('[role=combobox]');"
-        " const listbox = document.getElementById(input.getAttribute('aria-owns') ||"
-        " input.getAttribute('aria-controls')); const options = listbox ?"
-        " Array.from(listbox.querySelectorAll('[role=option]')) : [];"
+        "const listbox = document.getElementById('select2-' + arguments[0].id + '-results');"
+        " const options = listbox ? Array.from(listbox.querySelectorAll('[role=option]'))"
+        " .filter(o => !o.classList.contains('loading-results')) : [];"
         " const label = o => o.textContent.trim();"
+    )
+    _SELECTION = (
+        "const id = 'select2-' + arguments[0].id + '-container';"
+        " const byLabel = document.querySelector('[aria-labelledby=\"' + id + '\"]');"
+        " const rendered = document.getElementById(id);"
+        " const own = window.jQuery && jQuery(arguments[0]).data('select2');"
+        " const selection = byLabel || (rendered && rendered.closest('.select2-selection'))"
+        " || (own && own.$selection ? own.$selection[0] : null);"
     )
     _SEARCH = (
         ".select2-container--open .select2-search--dropdown:not(.select2-search--hide)"
@@ -481,7 +491,9 @@ class Select2Dropdown(AriaDropdown):
         """Types into the open dropdown's search box; returns once the list is filtered for it."""
         log.info("[%s] search '%s'", self.label, text)
         self.open()
-        field = self.driver.find_element(By.CSS_SELECTOR, self._SEARCH)
+        field = self._search_field()
+        if field is None:
+            raise ValueError(f"{self} has no search box")
         field.clear()
         field.send_keys(text)
         self.waits.until(lambda _: self.results_shown_for(text), f"options of {self} for '{text}'")
@@ -489,21 +501,36 @@ class Select2Dropdown(AriaDropdown):
 
     def select(self, text: str) -> Self:
         """Picks the option labelled `text`: from the open list, searching first when it isn't
-        listed and the dropdown has a search box."""
-        self.open()
-        if text not in self.options() and self._has_search():
-            self.search(text)
-        option = self.js(
-            self._LISTBOX + " return options.find(o => label(o) === arguments[1]) || null", text
-        )
-        if option is None:
-            raise ValueError(f"No option '{text}' in {self}, listed: {self.options()[:20]}")
-        log.info("[%s] select '%s'", self.label, text)
-        option.click()
+        listed and the dropdown has a search box. A multiple select: adds it (`choose`)."""
+        if self.is_multiple():
+            return self.choose(text)
+        self._click_option(text)
         self._wait_chosen(text)
         return self
 
+    def choose(self, *items: str) -> Self:
+        """A multiple select: adds each item not chosen yet, then closes the dropdown."""
+        for item in items:
+            if item in self.chosen():
+                continue
+            self._click_option(item)
+            self.waits.until(lambda _, i=item: i in self.chosen(), f"{self} has '{item}' chosen")
+        return self.close()
+
+    def chosen(self) -> list[str]:
+        """The labels of the chosen options — of the underlying <select>, the widget's truth."""
+        return self.js(
+            "return Array.from(arguments[0].selectedOptions).map(o => o.textContent.trim())"
+            ".filter(t => t)"
+        )
+
+    def is_multiple(self) -> bool:
+        return bool(self.root.get_property("multiple"))
+
     def selected(self) -> str:
+        """The choice shown; a multiple select: its chosen labels joined by ", "."""
+        if self.is_multiple():
+            return ", ".join(self.chosen())
         return self.js(
             "const r = document.getElementById('select2-' + arguments[0].id + '-container');"
             " return r ? (r.getAttribute('title') || r.textContent).trim() : ''",
@@ -517,25 +544,57 @@ class Select2Dropdown(AriaDropdown):
             "return Array.from(arguments[0].options).map(o => o.textContent.trim())", self.root
         )
 
+    def open(self) -> Self:
+        if not self.is_open():
+            self._input().click()
+            self.waits.until(lambda _: self.is_open(), f"{self} open")
+        return self
+
     def close(self) -> Self:
         if self.is_open():
-            self._input().send_keys(Keys.ESCAPE)
+            field = self._search_field()
+            (field if field is not None else self._input()).send_keys(Keys.ESCAPE)
             self.waits.until(lambda _: not self.is_open(), f"{self} closed")
         return self
 
-    def results_shown_for(self, text: str) -> bool:
+    def is_open(self) -> bool:
         return bool(
             self.js(
-                self._LISTBOX + " const field = document.querySelector(arguments[2]);"
-                " return !!field && field.value === arguments[1] && !!listbox &&"
-                " !listbox.querySelector('.loading-results')",
-                text,
-                self._SEARCH,
+                self._SELECTION + " const c = selection && selection.closest('.select2-container');"
+                " return !!c && c.classList.contains('select2-container--open')"
             )
         )
 
-    def _input(self) -> WebElement:
-        return self.root.find_element(By.XPATH, "following-sibling::span[1]//*[@role='combobox']")
+    def results_shown_for(self, text: str) -> bool:
+        field = self._search_field()
+        if field is None or field.get_property("value") != text:
+            return False
+        loaded = " return !!listbox && !listbox.querySelector('.loading-results')"
+        return bool(self.js(self._LISTBOX + loaded))
 
-    def _has_search(self) -> bool:
-        return bool(self.driver.find_elements(By.CSS_SELECTOR, self._SEARCH))
+    def _click_option(self, text: str) -> None:
+        self.open()
+        if text not in self.options() and self._search_field() is not None:
+            self.search(text)
+        option = self.js(
+            self._LISTBOX + " return options.find(o => label(o) === arguments[1]) || null", text
+        )
+        if option is None:
+            raise ValueError(f"No option '{text}' in {self}, listed: {self.options()[:20]}")
+        log.info("[%s] select '%s'", self.label, text)
+        option.click()
+
+    def _input(self) -> WebElement:
+        selection = self.js(self._SELECTION + " return selection")
+        if selection is None:
+            raise ValueError(f"{self}: no select2 widget for #{self.root.get_dom_attribute('id')}")
+        return selection
+
+    def _search_field(self) -> WebElement | None:
+        """The search box shown now: the open dropdown's, else a multiple select's inline one."""
+        fields = self.driver.find_elements(By.CSS_SELECTOR, self._SEARCH) or [
+            f
+            for f in self._input().find_elements(By.CSS_SELECTOR, ".select2-search__field")
+            if f.is_displayed()
+        ]
+        return fields[0] if fields else None

@@ -83,14 +83,16 @@ the cookie the app's login sets, read by `scripts/walk-session.sh`); logins are 
 - The standard set (`autotests.elements`, proven on every widget variant of the qa-playground
   `/widgets` gallery in Chrome and Firefox, 2026-10-11): `Button`, `Input`, `CheckBox`,
   `RadioGroup`, `FileUpload`, `Calendar`, `SelectDropdown`, `ListDropdown`, `AriaDropdown`,
-  `MultiSelectDropdown`, `ReactSelectDropdown`, `Select2Dropdown` (declared on the hidden `<select>`;
-  ⚠ proven on one app) (one `Dropdown` protocol), `Table`, `Modal`,
+  `MultiSelectDropdown`, `ReactSelectDropdown`, `Select2Dropdown` (declared on the hidden `<select>`,
+  the widget found by its id — `aria-labelledby="select2-<id>-container"` — not by its place;
+  multiple selects: `choose(*items)`, `chosen()`; 4.0 and 4.1) (one `Dropdown` protocol), `Table`, `Modal`,
   `Toasts`, `Tabs`, `Menu`, `Pagination`. By ARIA roles and common markup, so they fit most apps.
 - **No new element classes unless the user asks** — a widget none fits: a subclass overriding its
   CSS hooks (`ListDropdown.toggle_css`), or stop and ask. Screen-specific reading (a badge, a
   row's checkbox) lives in the page.
 - React apps: `Input.type_kept` (a field drawn again while typed into), `Button.click_until(what,
-  done)` (a click the app loses or a toast covers), `CheckBox` clicks a 0 px box's label or cell.
+  done)` (a click the app loses or a toast covers), `CheckBox` and `RadioGroup` click a 0 px
+  input's label (or cell).
   A fix the elements lack, seen in a second page, goes into the element — not a loop per page.
 - Passwords: `Input.type` / `clear_and_type` take a `SecretStr` and log `***` — pass the
   credential's `SecretStr` as is, never `.get_secret_value()` (the log would hold it; lab9).
