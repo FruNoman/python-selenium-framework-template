@@ -27,9 +27,9 @@ no `loader.load(...)` in a test body.
 - `browser` (function scope): **a fresh browser per test**, quit after it — no cookies, storage or
   windows leak between tests. `Browser(driver, settings, waits)` is what pages take.
 - `driver/factory.py`: local Chrome/Firefox or `webdriver.Remote` on the Grid
-  (`--runner grid`, `GRID_URL`). Implicit wait 0 always. On a Grid, Chrome gets CDP focus
-  emulation (parallel sessions on one node take each other's focus — focus/blur widgets flake
-  otherwise). Firefox's console comes over BiDi (`enable_bidi`); the Grid's nodes need
+  (`--runner grid`, `GRID_URL`). Implicit wait 0 always. Every Chrome (local and on a Grid)
+  gets CDP focus emulation (parallel sessions take each other's focus — focus/blur widgets and
+  clipboard writes flake otherwise). Firefox's console comes over BiDi (`enable_bidi`); the Grid's nodes need
   `SE_NODE_GRID_URL` = the URL clients use.
 - Logged in before the test starts: the `authenticate(browser, user)` fixture (ONBOARD —
   `login-strategies`: a session cookie or token injected, never the login form outside the
