@@ -25,11 +25,28 @@ log = logging.getLogger("api")
 
 SEPARATOR = "_" * 100
 MAX_BODY = 20_000
-SECRET_HEADERS = {"authorization", "proxy-authorization", "cookie", "set-cookie", "x-api-key"}
-_SECRET_NAME = re.compile(r"(?i).*(password|passwd|secret|token|api_?key).*")
-_SECRET_JSON_FIELD = re.compile(
-    r'(?i)("[^"]*(password|passwd|secret|token|api_?key)[^"]*"\s*:\s*)"[^"]*"'
-)
+SECRET_HEADERS = {
+    "authorization",
+    "proxy-authorization",
+    "cookie",
+    "set-cookie",
+    "x-api-key",
+    "x-csrf-token",
+}
+_SECRET_PART = re.compile(r"(?i)password|passwd|secret|token|api_?key")
+# a name's words: camelCase, PascalCase, ACRONYMS, snake_case, kebab-case (CurrentPIN: Current PIN)
+_WORDS = re.compile(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|\d+")
+# a JSON field with a string or number value: group 1 = up to the value, group 2 = the name
+_JSON_FIELD = re.compile(r'("((?:[^"\\]|\\.)*)"\s*:\s*)("(?:[^"\\]|\\.)*"|-?\d+(?:\.\d+)?)')
+
+
+def is_secret_name(name: str) -> bool:
+    """A field or form parameter whose value never prints: a password, a secret, a token, an API
+    key — or a PIN (`PIN`, `pin`, `confirm_pin`, `CurrentPIN`, `NewPIN`; not `spinner`,
+    `pinned`)."""
+    return bool(_SECRET_PART.search(name)) or any(
+        word.lower() == "pin" for word in _WORDS.findall(name)
+    )
 
 
 def log_calls(session: requests.Session) -> requests.Session:
@@ -84,7 +101,7 @@ def _headers(headers: Iterable[tuple[str, str | bytes]]) -> str:
 
 def _form_params(params: Iterable[tuple[str, str]]) -> str:
     return "".join(
-        f"form: {name}={_masked(bool(_SECRET_NAME.match(name)), value)}\n" for name, value in params
+        f"form: {name}={_masked(is_secret_name(name), value)}\n" for name, value in params
     )
 
 
@@ -107,7 +124,9 @@ def _body(body: str) -> str:
     """The body, its secret fields masked and cut at MAX_BODY; "" when there is none."""
     if not body:
         return ""
-    safe = _SECRET_JSON_FIELD.sub(r'\1"***"', body)
+    safe = _JSON_FIELD.sub(
+        lambda m: f'{m.group(1)}"***"' if is_secret_name(m.group(2)) else m.group(0), body
+    )
     if len(safe) > MAX_BODY:
         safe = f"{safe[:MAX_BODY]}\n… ({len(safe) - MAX_BODY} more characters)"
     return safe + "\n"
