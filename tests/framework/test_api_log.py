@@ -75,3 +75,32 @@ def test_a_form_post_is_logged_as_form_lines() -> None:
     with check:
         assert "RESPONSE: 302 (42 ms)" in lines
         assert "Location: /home" in lines
+
+
+def test_pins_and_the_csrf_header_are_masked_not_words_containing_pin() -> None:
+    block = _exchange(
+        requests.Request(
+            "POST",
+            "https://app.example/api/pin",
+            headers={"X-CSRF-TOKEN": "csrf-value"},
+            json={
+                "PIN": "1111",
+                "pin": 2222,
+                "confirm_pin": "3333",
+                "CurrentPIN": "4444",
+                "NewPIN": "5555",
+                "spinner": "on",
+                "pinned": "yes",
+            },
+        ),
+        200,
+        "{}",
+    )
+
+    with check:
+        assert "X-CSRF-TOKEN: ***" in block.splitlines(), "the CSRF header"
+    with check:
+        assert not any(pin in block for pin in ("1111", "2222", "3333", "4444", "5555")), "PINs"
+    with check:
+        assert '"spinner": "on"' in block, "a word containing pin stays"
+        assert '"pinned": "yes"' in block, "a word containing pin stays"

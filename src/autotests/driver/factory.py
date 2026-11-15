@@ -79,13 +79,14 @@ def create_driver(settings: Settings) -> WebDriver:
             else settings.grid.url
         )
         driver = webdriver.Remote(command_executor=executor, options=options)
-        if chrome:
-            # several Chrome sessions on one Grid node take each other's window focus: a click in
-            # one blurs the pages of the others, and focus/blur-driven widgets fail at random
-            driver.execute(
-                "executeCdpCommand",
-                {"cmd": "Emulation.setFocusEmulationEnabled", "params": {"enabled": True}},
-            )
+    if chrome:
+        # parallel Chrome sessions (on one Grid node, or local under -n N) take each other's window
+        # focus: a click in one blurs the others, and focus-driven widgets and clipboard writes
+        # fail at random
+        driver.execute(
+            "executeCdpCommand",
+            {"cmd": "Emulation.setFocusEmulationEnabled", "params": {"enabled": True}},
+        )
     driver.implicitly_wait(0)
     driver.set_page_load_timeout(settings.waits.page_load)
     if not chrome:

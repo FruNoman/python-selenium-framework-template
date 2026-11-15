@@ -31,13 +31,14 @@ for known bugs. The test-data JSON (placeholders, camelCase keys) reads the same
 
 | Module | What |
 |---|---|
-| `autotests/elements/` | The standard elements, by ARIA roles and common markup: `Button`, `Input`, `CheckBox`, `RadioGroup`, `FileUpload`, `Calendar`; `SelectDropdown` / `ListDropdown` / `AriaDropdown` (portal listboxes, async search) / `MultiSelectDropdown` / `ReactSelectDropdown` / `Select2Dropdown` (jQuery select2 4.x — ⚠ proven on one app, Lightning Step, 2026-10-11) (one `Dropdown` protocol); `Table`, `Modal`, `Toasts`, `Tabs`, `Menu`, `Pagination`. Declared as class attributes of a page, found again on every use, every action logged. **Proven on every widget variant of the qa-playground `/widgets` gallery — 17 tests, Chrome and Firefox (2026-10-11).** |
-| `autotests/pages/base_page.py` | `BasePage(browser)`: `path`, `is_loaded()`, `open()`, `get()`, `wait_loaded()`; the app's pages in `pages/<area>/` |
-| `autotests/support/` | `Waits` (explicit only: `until`, `for_new_document`, `for_change`), failure artifacts, `shared_state` (`@pytest.mark.shared_state(key, state)` — a global switch in a state, a lock file per key) |
-| `autotests/data/` | `TestDataLoader` (JSON variants, per-env files, placeholders `{{uniqueTimestamp}}`, `{{inDays:3}}` (ISO; `{{inDays:3:%m/%d/%Y}}` strftime), Faker…), `TestData` models (pydantic), `data_fixture`, typed texts (`UiTexts` models, `texts_fixture`) |
+| `autotests/elements/` | The standard elements, by ARIA roles and common markup: `Button`, `Input`, `CheckBox`, `RadioGroup`, `FileUpload`, `Calendar`; `SelectDropdown` / `ListDropdown` / `AriaDropdown` (portal listboxes, async search) / `MultiSelectDropdown` / `ReactSelectDropdown` / `Select2Dropdown` (jQuery select2 4.0 / 4.1, single and multiple — `choose(*items)`; found by the select's id) (one `Dropdown` protocol); `Table`, `Modal`, `Toasts`, `Tabs`, `Menu`, `Pagination`. Declared as class attributes of a page, found again on every use, every action logged. **Proven on every widget variant of the qa-playground `/widgets` gallery — 17 tests, Chrome and Firefox (2026-10-11).** |
+| `autotests/pages/base_page.py` | `BasePage(browser)`: `path`, `is_loaded()`, `open()`, `get()`, `wait_loaded()`, `wait_scripts_loaded()` (before a header / user-menu action); the app's pages in `pages/<area>/`, extending the app's `AppPage` (header, user menu) |
+| `autotests/support/` | `Waits` (explicit only: `until`, `for_new_document`, `for_change`, `for_scripts_loaded`), failure artifacts, `shared_state` (`@pytest.mark.shared_state(key, state)` — a global switch in a state, a lock file per key) |
+| `autotests/data/` | `TestDataLoader` (JSON variants, per-env files, placeholders `{{uniqueTimestamp}}`, `{{inDays:3}}` (ISO; `{{inDays:3:%m/%d/%Y}}` strftime), Faker…), `TestData` models (pydantic), `data_fixture`, typed texts (`UiTexts` models, `texts_fixture`; `ui-texts.json` and/or one `ui-texts/<area>.json` per area, merged) |
 | `autotests/api/` | `ApiClient` (requests, DTOs in and out, secrets masked in the log; ONBOARD: auth; `post_form` for server-rendered forms), `forms.py` (`form_fields(html, form_id)` — what a browser would post — + `with_values`), `WebClient` (plain HTTP, redirects are answers) |
 | `autotests/testdata/` | functions building what tests create through the API, one module per area; the fixture that calls one yields and deletes in `finally` |
 | `autotests/auth/` | `User` (least privileged first), `Credentials` (from `resources/data/user-data.json`) |
+| `autotests/step.py` | `with step("<what the user does>"):` around each case step (or `@step("…")` on a page method) — `STEP <n>: …` in the test's log, the steps in the HTML report, the failed step in the failure's info |
 | `autotests/plugin.py` | the pytest plugin: options, `settings`, `browser`, `user`, `authenticate`, data/texts/api fixtures, the rarer shared state collected first, logs per test, artifacts on failure and xfail (screenshot in the HTML report), a timeout per test |
 
 Tests: `tests/framework` (the wiring on about:blank — no app or network needed; a project drops
@@ -49,8 +50,10 @@ only, removed right after cloning:
 rm -rf tests/example resources/data/web-form-data.json
 ```
 
-Soft assertions: `with check: assert …, "what"` (pytest-check). Known product bugs:
-`@pytest.mark.xfail(strict=True, reason="…")` — runs every time, a fixed bug turns the run red.
+Soft assertions: `with check: assert …, "what"` (pytest-check). Known product bugs: `with
+known_bug("<KEY>: <why>"):` around the one check the bug breaks (XFAIL while it reproduces, red
+once it doesn't); `@pytest.mark.xfail(strict=True, reason="…")` only when the bug blocks the
+test's start — both run every time, a fixed bug turns the run red.
 Style: `ruff format` + `ruff check` (PEP 8, isort, bugbear, pyupgrade, simplify, naming, comprehensions, commented-out code, perf, returns, pathlib, complexity, pytest style, unused arguments in `src/`); types: `pyright` (standard mode, `[tool.pyright]` in pyproject) — all three in `make check`. `make hooks` once per clone turns on the pre-commit style gate (`.githooks/pre-commit`).
 
 ## Run
@@ -90,6 +93,15 @@ recipes (GitHub Actions, Jenkins, GitLab, Azure) are in the plugin's `ci-setup`.
 local Grid off 4444 when another project's Grid runs there.
 
 Proven 2026-10-11: local Chrome and Firefox, Grid Chrome and Firefox, the CI compose — 14/14 each.
+
+## Qase
+
+A writable Qase reports through its pytest reporter: add `qase-pytest` to the dependencies, a test of
+a case carries `@qase.id(<id>)` (and the id in its name), reporting is off unless
+`QASE_MODE=testops` (+ `QASE_TESTOPS_PROJECT`, `QASE_TESTOPS_API_TOKEN` — tooling tokens, never in
+the repo). Tests without a case id are never reported: the plugin marks them `qase_ignore` (in
+testops mode a result without a case id makes Qase create a new case outside the suite) — so
+`tests/framework` and helper tests stay out of the TMS.
 
 ## Credentials
 

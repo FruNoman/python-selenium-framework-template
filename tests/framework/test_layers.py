@@ -11,20 +11,23 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 import pytest
+import yaml
 from pydantic import SecretStr
 from pytest_check import check
 
 from autotests.api.client import ApiClient
-from autotests.config.settings import load_settings
+from autotests.config.settings import ROOT, Settings, load_settings
 from autotests.data.loader import TestDataLoader
 from autotests.data.models import TestData
 from autotests.data.placeholders import process
+from autotests.data.texts import load_ui_texts
 from autotests.support import shared_state
 
 # --- settings
 
 
 def test_settings_layers_env_vars_and_options() -> None:
+    ci_layer = yaml.safe_load((ROOT / "config" / "application-ci.yml").read_text())
     from_env = load_settings(environ={"BASE_URL": "https://stage.example/", "HEADLESS": "false"})
     from_cli = load_settings({"browser.name": "firefox", "runner": "grid"}, environ={})
 
@@ -35,7 +38,18 @@ def test_settings_layers_env_vars_and_options() -> None:
     with check:
         assert (from_cli.browser.name, from_cli.runner) == ("firefox", "grid"), "CLI options"
     with check:
-        assert load_settings(environ={"CI": "true"}).waits.timeout == 20, "the CI layer"
+        assert (
+            load_settings(environ={"CI": "true"}).waits.timeout == ci_layer["waits"]["timeout"]
+        ), "the CI layer"
+
+
+def test_an_env_file_may_name_the_session_cookie() -> None:
+    settings = Settings.model_validate(
+        {"base": {"url": "https://app.example/"}, "auth": {"session-cookie": "sid"}}
+    )
+
+    assert settings.auth is not None, "the auth section is a known key"
+    assert settings.auth.session_cookie == "sid", "auth.session-cookie, as walk-session.sh reads it"
 
 
 def test_an_unknown_environment_fails_fast() -> None:
@@ -110,6 +124,20 @@ def test_variants_env_overrides_and_masked_secrets(tmp_path: Path) -> None:
         assert "s3cret" not in str(admin.password), "secret hidden"
     with check:
         assert loader.variant_names(SampleData) == ["default", "admin"], "the env file's variants"
+
+
+def test_ui_texts_merge_the_single_file_and_a_file_per_area(tmp_path: Path) -> None:
+    (tmp_path / "ui-texts").mkdir()
+    (tmp_path / "ui-texts.json").write_text(json.dumps({"default": {"orders": {"saved": "Saved"}}}))
+    (tmp_path / "ui-texts" / "login.json").write_text(json.dumps({"welcome": "Hi"}))
+
+    texts = load_ui_texts(tmp_path)
+
+    with check:
+        assert texts == {"orders": {"saved": "Saved"}, "login": {"welcome": "Hi"}}, "merged"
+    (tmp_path / "ui-texts" / "orders.json").write_text(json.dumps({"saved": "Done"}))
+    with pytest.raises(ValueError, match="'orders' is defined twice"):
+        load_ui_texts(tmp_path)
 
 
 # --- API

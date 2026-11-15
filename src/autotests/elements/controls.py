@@ -150,6 +150,30 @@ def _is_native(element: WebElement) -> bool:
     return element.tag_name == "input"
 
 
+def _has_size(element: WebElement) -> bool:
+    return element.is_displayed() and element.size["height"] > 0 and element.size["width"] > 0
+
+
+def _click_target(driver: WebDriver, box: WebElement) -> WebElement:
+    """What a click on a checkbox or radio goes to: the box, or — a styled one whose input is 0 px
+    (React kits) — its label (`label[for]`, else the label around it), else the nearest ancestor
+    with a size."""
+    if _has_size(box):
+        return box
+    box_id = box.get_dom_attribute("id")
+    labels = driver.find_elements(By.CSS_SELECTOR, f"label[for='{box_id}']") if box_id else []
+    labels += box.find_elements(By.XPATH, "ancestor::label[1]")
+    for label in labels:
+        if _has_size(label):
+            return label
+    ancestor = box
+    for _ in range(5):
+        ancestor = ancestor.find_element(By.XPATH, "..")
+        if ancestor.size["height"] > 0 and ancestor.size["width"] > 0:
+            return ancestor
+    return box
+
+
 class CheckBox(Element):
     """Anything on/off: input[type=checkbox], role=checkbox / role=switch (aria-checked), or a
     wrapper (a label, a component) with one of those inside."""
@@ -166,7 +190,7 @@ class CheckBox(Element):
             return self
         log.info("[%s] %s", self.label, "check" if checked else "uncheck")
         self.waits.until(lambda _: self.is_enabled(), f"{self} enabled")
-        self._click_target().click()
+        _click_target(self.driver, self._box()).click()
         self.waits.until(
             lambda _: self.is_checked() == checked,
             f"{self} {'checked' if checked else 'unchecked'}",
@@ -205,24 +229,6 @@ class CheckBox(Element):
         inner = root.find_elements(By.CSS_SELECTOR, "input[type=checkbox], [aria-checked]")
         return inner[0] if inner else root
 
-    def _click_target(self) -> WebElement:
-        # the box, or — a styled box whose input is 0 px (React grids) — its label, else the
-        # nearest ancestor with a size
-        box = self._box()
-        if box.is_displayed() and box.size["height"] > 0 and box.size["width"] > 0:
-            return box
-        box_id = box.get_dom_attribute("id")
-        if box_id:
-            labels = self.driver.find_elements(By.CSS_SELECTOR, f"label[for='{box_id}']")
-            if labels and labels[0].is_displayed():
-                return labels[0]
-        ancestor = box
-        for _ in range(5):
-            ancestor = ancestor.find_element(By.XPATH, "..")
-            if ancestor.size["height"] > 0 and ancestor.size["width"] > 0:
-                return ancestor
-        return box
-
 
 class RadioGroup(Element):
     """A group of radios, declared on its container: native input[type=radio] or role=radiogroup
@@ -234,7 +240,7 @@ class RadioGroup(Element):
         if not self._enabled(radio):
             raise ValueError(f"Option '{value_or_label}' of {self} is disabled")
         log.info("[%s] select '%s'", self.label, value_or_label)
-        radio.click()
+        _click_target(self.driver, radio).click()  # a 0 px React radio: its label
         self.waits.until(lambda _: self._checked(radio), f"{self} '{value_or_label}' checked")
         return self
 

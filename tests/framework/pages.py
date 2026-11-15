@@ -7,7 +7,7 @@ from typing import Self
 
 from selenium.webdriver.common.by import By
 
-from autotests.elements import Button, CheckBox, Element, Input
+from autotests.elements import Button, CheckBox, Element, Input, RadioGroup
 from autotests.pages.base_page import BasePage
 
 
@@ -21,8 +21,8 @@ class BlankPage(BasePage):
 
 class ReactQuirksPage(BlankPage):
     """What React apps do to WebDriver: a field drawn again right after it is typed into (the text
-    lost), a button whose first click is ignored, a checkbox 0 px high that its cell toggles, a
-    toast removed after a moment."""
+    lost), a button whose first click is ignored, a checkbox 0 px high that its cell toggles, radios
+    0 px wide behind their labels, a toast removed after a moment."""
 
     _QUIRKS = """
       document.body.innerHTML = `
@@ -31,6 +31,11 @@ class ReactQuirksPage(BlankPage):
         <div id="cell" style="width:34px;height:20px">
           <label style="display:block;height:0;overflow:hidden">
             <input type="checkbox" id="box" style="width:0;height:0;margin:0"></label></div>
+        <div id="size">
+          <input type="radio" name="size" id="s" value="s" style="width:0;height:0;margin:0">
+          <label for="s">Small</label>
+          <input type="radio" name="size" id="l" value="l" style="width:0;height:0;margin:0">
+          <label for="l">Large</label></div>
         <div id="toast">Saved</div>`;
       const field = document.getElementById('field');
       let drawnAgain = false;
@@ -54,6 +59,7 @@ class ReactQuirksPage(BlankPage):
     quantity = Input(By.ID, "qty")
     next_button = Button(By.ID, "next")
     box = CheckBox(By.ID, "box")
+    size = RadioGroup(By.ID, "size")
     _step = Element(By.ID, "step")
     _toast = Element(By.ID, "toast")
 

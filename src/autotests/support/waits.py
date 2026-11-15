@@ -66,6 +66,16 @@ class Waits:
 
         self.until(replaced, message)
 
+    def for_scripts_loaded(self, timeout: float | None = None) -> None:
+        """Until the document's scripts ran (`readyState == "complete"`): a widget the page's late
+        scripts bind (a header dropdown, a user menu) ignores a click before that — a slow app
+        loads them long after the DOM is ready."""
+        self.until(
+            lambda d: d.execute_script("return document.readyState") == "complete",
+            "the page's scripts loaded",
+            timeout,
+        )
+
     def for_change(self, state: Callable[[], T], action: Callable[[], object], message: str) -> T:
         """Runs the action and returns once `state()` reads something else than before it —
         sorting or paging that may redraw in place or load a new document."""

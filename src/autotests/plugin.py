@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import base64
 import contextlib
+import html
 import logging
 from collections import Counter
 from collections.abc import Callable, Iterator
@@ -27,10 +28,12 @@ import pytest
 from pytest_check import check_log
 from selenium.common.exceptions import WebDriverException
 
+from autotests import step as test_steps
 from autotests.api.client import ApiClient
 from autotests.auth.users import Credentials, User
 from autotests.config.settings import Settings, load_settings
 from autotests.data.loader import TestDataLoader
+from autotests.data.texts import load_ui_texts
 from autotests.driver.factory import create_driver
 from autotests.pages.base_page import Browser
 from autotests.support import artifacts, shared_state
@@ -62,11 +65,12 @@ def pytest_configure(config: pytest.Config) -> None:
     config._autotests_settings = load_settings(cli)  # type: ignore[attr-defined]
 
 
-def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     """The tests of a shared resource's less common state run first, all together: the resource
     is switched once for them and once back, instead of the states taking turns all run long — a
     test waiting for another state waits for every holder of the current one. Every xdist worker
     sorts the same way, and its scheduler follows the order."""
+    _report_only_cases_to_qase(config, items)
     states: dict[str, Counter[Any]] = {}
     for item in items:
         marker = item.get_closest_marker("shared_state")
@@ -84,6 +88,17 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     items[:] = [i for i in items if rare(i)] + [i for i in items if not rare(i)]
 
 
+def _report_only_cases_to_qase(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """With the Qase reporter (qase-pytest) installed, only tests of a case (`@qase.id(…)`) report:
+    in testops mode a result without a case id makes Qase create a new case outside the suite —
+    tests/framework and any test without a case are marked `qase_ignore`."""
+    if not config.pluginmanager.has_plugin("qase_pytest"):
+        return
+    for item in items:
+        if item.get_closest_marker("qase_id") is None:
+            item.add_marker(pytest.mark.qase_ignore())
+
+
 # --- settings, logs
 
 
@@ -94,7 +109,8 @@ def settings(pytestconfig: pytest.Config) -> Settings:
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_setup(item: pytest.Item) -> Iterator[None]:
-    """One log file per test: <logs.dir>/tests/<test>.log."""
+    """One log file per test: <logs.dir>/tests/<test>.log; the test's steps start from 1."""
+    test_steps.reset()
     settings: Settings = item.config._autotests_settings  # type: ignore[attr-defined]
     folder = settings.path(settings.logs.dir) / "tests"
     folder.mkdir(parents=True, exist_ok=True)
@@ -191,9 +207,13 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[Any]) -> 
         settings: Settings = item.config._autotests_settings  # type: ignore[attr-defined]
         folder = settings.path(settings.artifacts.dir) / artifacts.folder_name(item.nodeid)
         failure = _failure_line(item, call, report)
+        broken = test_steps.failed()
+        if broken is not None:
+            failure = f"{failure} (at STEP {broken.number}: {broken.title})"
         saved = artifacts.save(browser.driver, folder, item.nodeid, failure)
         _attach_to_html_report(item, report, saved / "screenshot.png", browser)
     if report.when == "call":
+        _steps_to_html_report(item, report)
         log.info(
             "%s %s (%.1f s)",
             "✔" if report.passed else "✘ XFAIL" if hasattr(report, "wasxfail") else "✘ FAIL",
@@ -219,6 +239,26 @@ def _attach_to_html_report(
     report.extras = extras  # type: ignore[attr-defined] — pytest-html reads it
 
 
+def _steps_to_html_report(item: pytest.Item, report: pytest.TestReport) -> None:
+    """The test's steps (`autotests.step`) as a list in its row of the HTML report — which one
+    broke shows without opening the log."""
+    taken = test_steps.taken()
+    if not taken or item.config.pluginmanager.getplugin("html") is None:
+        return
+    from pytest_html import extras as html_extras
+
+    marks = {"passed": "✔", "failed": "✘", "check failed": "✘ check", "running": "…"}
+    rows = "".join(
+        f"<li>{marks[s.status]} STEP {s.number}: {html.escape(s.title)} ({s.seconds:.1f} s)"
+        + (f" — {html.escape(s.error)}" if s.error else "")
+        + "</li>"
+        for s in taken
+    )
+    extras = getattr(report, "extras", [])
+    extras.append(html_extras.html(f'<ul class="autotests-steps">{rows}</ul>'))
+    report.extras = extras  # type: ignore[attr-defined] — pytest-html reads it
+
+
 # --- test data
 
 
@@ -229,11 +269,8 @@ def test_data_loader(settings: Settings) -> TestDataLoader:
 
 @pytest.fixture(scope="session")
 def ui_texts(settings: Settings) -> dict[str, Any]:
-    """resources/data/ui-texts.json → its "default" variant: area → texts."""
-    import json
-
-    path = settings.path(settings.data.dir) / "ui-texts.json"
-    return json.loads(path.read_text())["default"] if path.exists() else {}
+    """resources/data/ui-texts.json ("default" variant) + ui-texts/<area>.json: area → texts."""
+    return load_ui_texts(settings.path(settings.data.dir))
 
 
 # --- shared state

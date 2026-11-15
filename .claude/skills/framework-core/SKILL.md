@@ -27,9 +27,9 @@ no `loader.load(...)` in a test body.
 - `browser` (function scope): **a fresh browser per test**, quit after it — no cookies, storage or
   windows leak between tests. `Browser(driver, settings, waits)` is what pages take.
 - `driver/factory.py`: local Chrome/Firefox or `webdriver.Remote` on the Grid
-  (`--runner grid`, `GRID_URL`). Implicit wait 0 always. On a Grid, Chrome gets CDP focus
-  emulation (parallel sessions on one node take each other's focus — focus/blur widgets flake
-  otherwise). Firefox's console comes over BiDi (`enable_bidi`); the Grid's nodes need
+  (`--runner grid`, `GRID_URL`). Implicit wait 0 always. Every Chrome (local and on a Grid)
+  gets CDP focus emulation (parallel sessions take each other's focus — focus/blur widgets and
+  clipboard writes flake otherwise). Firefox's console comes over BiDi (`enable_bidi`); the Grid's nodes need
   `SE_NODE_GRID_URL` = the URL clients use.
 - Logged in before the test starts: the `authenticate(browser, user)` fixture (ONBOARD —
   `login-strategies`: a session cookie or token injected, never the login form outside the
@@ -45,7 +45,8 @@ Layers, later wins: `config/application.yml` → `config/application-ci.yml` (`C
 `resources/env/<env>.yml` (`--env` / `TEST_ENV`, default `dev`) → env vars (`BASE_URL`, `RUNNER`,
 `BROWSER`, `HEADLESS`, `GRID_URL`, `WAITS_TIMEOUT`) → options (`--env`, `--runner`, `--browser`,
 `--headed`). One frozen `Settings` per run (the `settings` fixture); nothing else reads
-`os.environ`. An env file holds URLs and non-secret per-env settings; logins are test data.
+`os.environ`. An env file holds URLs and non-secret per-env settings (`auth.session-cookie` —
+the cookie the app's login sets, read by `scripts/walk-session.sh`); logins are test data.
 
 ## Pages
 
@@ -67,6 +68,11 @@ Layers, later wins: `config/application.yml` → `config/application-ci.yml` (`C
 - A page is named after its class: `web_form_page`, `orders_page` — never `page`, `form`.
 - An action that loads a new document waits for it: `self.waits.for_new_document(self._save.click)`
   — also when the URL stays the same (a form drawn again with errors).
+- What every page of the logged-in app shows (the header, the user menu) lives in the app's base
+  page `pages/app_page.py` (`AppPage(BasePage)`, the app's pages extend it). Each header / user
+  menu action calls `self.wait_scripts_loaded()` first (`document.readyState == "complete"`,
+  page-load timeout): the menu's widget is bound by the page's late scripts, and a slow app
+  ignores a click before that.
 
 ## Elements
 
@@ -77,14 +83,16 @@ Layers, later wins: `config/application.yml` → `config/application-ci.yml` (`C
 - The standard set (`autotests.elements`, proven on every widget variant of the qa-playground
   `/widgets` gallery in Chrome and Firefox, 2026-10-11): `Button`, `Input`, `CheckBox`,
   `RadioGroup`, `FileUpload`, `Calendar`, `SelectDropdown`, `ListDropdown`, `AriaDropdown`,
-  `MultiSelectDropdown`, `ReactSelectDropdown`, `Select2Dropdown` (declared on the hidden `<select>`;
-  ⚠ proven on one app) (one `Dropdown` protocol), `Table`, `Modal`,
+  `MultiSelectDropdown`, `ReactSelectDropdown`, `Select2Dropdown` (declared on the hidden `<select>`,
+  the widget found by its id — `aria-labelledby="select2-<id>-container"` — not by its place;
+  multiple selects: `choose(*items)`, `chosen()`; 4.0 and 4.1) (one `Dropdown` protocol), `Table`, `Modal`,
   `Toasts`, `Tabs`, `Menu`, `Pagination`. By ARIA roles and common markup, so they fit most apps.
 - **No new element classes unless the user asks** — a widget none fits: a subclass overriding its
   CSS hooks (`ListDropdown.toggle_css`), or stop and ask. Screen-specific reading (a badge, a
   row's checkbox) lives in the page.
 - React apps: `Input.type_kept` (a field drawn again while typed into), `Button.click_until(what,
-  done)` (a click the app loses or a toast covers), `CheckBox` clicks a 0 px box's label or cell.
+  done)` (a click the app loses or a toast covers), `CheckBox` and `RadioGroup` click a 0 px
+  input's label (or cell).
   A fix the elements lack, seen in a second page, goes into the element — not a loop per page.
 - Passwords: `Input.type` / `clear_and_type` take a `SecretStr` and log `***` — pass the
   credential's `SecretStr` as is, never `.get_secret_value()` (the log would hold it; lab9).
@@ -133,6 +141,9 @@ A package past ~10 modules splits by area; a module past ~500 lines splits by sc
   name. The app's texts: `ui-texts.json`, one typed model per area in `data/texts.py`
   (`class OrdersTexts(UiTexts)`, its `area` key) → `orders_texts = texts_fixture(OrdersTexts)`; a
   test annotates `orders_texts: OrdersTexts` — pyright checks every name.
+  An area may live in a file of its own, `resources/data/ui-texts/<area>.json` (the area's texts,
+  without the `default`/area wrapping) — the loader merges it with `ui-texts.json`, an area in both
+  is an error. New areas get their own file: parallel branches then never conflict on one JSON.
 - **What goes to data files**: what varies — per environment, per variant, per user, generated
   (unique, dates) — and the app's texts. A value one test uses once and that changes with nothing
   (a count, a fixed option of the case) may stay a named constant or a literal in the test.
@@ -141,7 +152,7 @@ A package past ~10 modules splits by area; a module past ~500 lines splits by sc
   `.env.local`.
 - API: `api/<area>/<x>_api.py` takes the request DTO (pydantic, `model_dump(by_alias=True)`) and
   returns parsed responses (`ApiResponse.expect_status(201).as_model(OrderResponse)`) — never a
-  dict built field by field. Every HTTP call (ApiClient, WebClient) is logged as one block by `api/log.py` (logger `api`) — the Java templates' layout: `____` lines, `REQUEST: METHOD URL`, headers, `form:` lines, pretty body, `RESPONSE: status (ms)`, headers, body; credential headers and password/secret/token fields masked, bodies cut at 20 000. `api.as_user(user)` — ONBOARD
+  dict built field by field. Every HTTP call (ApiClient, WebClient) is logged as one block by `api/log.py` (logger `api`) — the Java templates' layout: `____` lines, `REQUEST: METHOD URL`, headers, `form:` lines, pretty body, `RESPONSE: status (ms)`, headers, body; credential headers (and `X-CSRF-TOKEN`) and password/secret/token/API-key fields and PIN-named ones (`PIN`, `confirm_pin`, `NewPIN` — not `spinner`) masked, bodies cut at 20 000. `api.as_user(user)` — ONBOARD
   the app's auth. `WebClient` for plain HTTP to the web app (redirects are answers).
 - Preconditions through the API, not through other screens: a fixture creates, `yield`s, and
   deletes in `finally` — also when the test fails. Keep the id as soon as the app hands it out
@@ -162,7 +173,8 @@ junit.xml` for CI and the TMS.
 - Test code mirrors the TMS tree: top-level suite → package, leaf suite → `test_<leaf>.py`, case →
   `def test_<id>_<title>` — **TestRail** `test_C123_…` (trcli `parse_junit --case-matcher name`
   reads it from junit.xml), **Qase** read-only `test_LS83_add_new_diagnosis` (+ the id in the
-  docstring), a writable Qase: its pytest reporter. A test without a case has no id; never invent
+  docstring), a writable Qase: its pytest reporter (qase-pytest; the plugin marks every test without
+  `@qase.id` `qase_ignore`, so a result never creates a case outside the suite). A test without a case has no id; never invent
   one.
 - **Soft assertions — `pytest-check`**: one `with check: assert …, "what"` per expectation, so a
   run reports every broken one of the case; a plain `assert` only where going on is pointless (a
@@ -175,11 +187,23 @@ junit.xml` for CI and the TMS.
   turns the run **red** (XPASS, `xfail_strict = true`) — drop the marker then. Never `skip` it,
   never loosen the assertion. Prove it before marking: run it, read the artifacts — it must fail on
   the bug, not on a locator or data.
+  **Scope it to the check the bug breaks**: `with known_bug("<KEY>: <why>"):` (`autotests.known_bug`)
+  around that check only, inside the test — the block failing (an assert, a soft check, a wait) is
+  XFAIL with the reason (failure artifacts too) and the test stops there; the checks before it
+  still count (one failed = red); the block passing is red, "known bug <KEY> no longer reproduces —
+  remove the mark"; any failure outside the block stays red. The whole-test
+  `xfail(strict=True)` only when the bug blocks the test's start (its entry page, its
+  precondition) — otherwise it hides every other check of the case.
 - **A test module holds only tests** (and its imports): fixtures in conftest.py, flows tests repeat
   as preconditions in `tests/steps/<area>.py` (complete actions of the positive flow ending in a
   stable state, named verb + object — `create_order`), a step checks with a plain `assert`.
 - Steps a case repeats from another automated case are its precondition: done through a fixture
   or a step, not checked again.
+- **The case's steps in the report**: `with step("<what the user does>"):` (`autotests.step`)
+  around each step of the case, its checks inside — the test's log gets `STEP <n>: …`, the HTML
+  report the list of steps (✔ / ✘ / ✘ check), the failure's `info.txt` "(at STEP <n>: …)". A page
+  method may be a step too (`@step("Sign in")`, numbered `<n>.<m>` inside the test's step). The
+  title is the case step's action, not the code's (`"Save the order"`, not `"click #save"`).
 - **Parallel = processes** (`-n N`, pytest-xdist): no shared state between tests anyway; a value
   that must be unique across workers: `{{uniqueTimestamp}}` (carries the worker number). A resource
   of the environment several tests switch (a feature flag): a file lock per resource, not a module
