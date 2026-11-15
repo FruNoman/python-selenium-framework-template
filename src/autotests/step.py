@@ -1,7 +1,7 @@
 """Steps of a test in its log and in the HTML report — what the user does, so a failure says which
 step broke:
 
-    def test_LS12_save_order(orders_page, order_data):
+    def test_C12_save_order(orders_page, order_data):
         with step("Fill the order"):
             orders_page.fill(order_data)
 

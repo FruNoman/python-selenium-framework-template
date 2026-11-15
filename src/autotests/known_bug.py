@@ -1,12 +1,12 @@
 """A known product bug scoped to the one check it breaks — inside a test, around that check only:
 
-    def test_LS12_save_order(orders_page, orders_texts):
+    def test_C12_save_order(orders_page, orders_texts):
         orders_page.save()
 
         with check:
             assert orders_page.saved_toast() == orders_texts.saved, "the toast"
 
-        with known_bug("LS-345: the total ignores the discount"):
+        with known_bug("BUG-345: the total ignores the discount"):
             assert orders_page.total() == "90.00", "the total with the discount"
 
 The block failing (an assertion, a soft check, a wait timing out) is the bug: the test reports
