@@ -94,6 +94,15 @@ local Grid off 4444 when another project's Grid runs there.
 
 Proven 2026-10-11: local Chrome and Firefox, Grid Chrome and Firefox, the CI compose — 14/14 each.
 
+## Qase
+
+A writable Qase reports through its pytest reporter: add `qase-pytest` to the dependencies, a test of
+a case carries `@qase.id(<id>)` (and the id in its name), reporting is off unless
+`QASE_MODE=testops` (+ `QASE_TESTOPS_PROJECT`, `QASE_TESTOPS_API_TOKEN` — tooling tokens, never in
+the repo). Tests without a case id are never reported: the plugin marks them `qase_ignore` (in
+testops mode a result without a case id makes Qase create a new case outside the suite) — so
+`tests/framework` and helper tests stay out of the TMS.
+
 ## Credentials
 
 The tests' logins are test data — `resources/data/user-data.json`, a row per user — never env

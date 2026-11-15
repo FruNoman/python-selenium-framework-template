@@ -64,11 +64,12 @@ def pytest_configure(config: pytest.Config) -> None:
     config._autotests_settings = load_settings(cli)  # type: ignore[attr-defined]
 
 
-def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     """The tests of a shared resource's less common state run first, all together: the resource
     is switched once for them and once back, instead of the states taking turns all run long — a
     test waiting for another state waits for every holder of the current one. Every xdist worker
     sorts the same way, and its scheduler follows the order."""
+    _report_only_cases_to_qase(config, items)
     states: dict[str, Counter[Any]] = {}
     for item in items:
         marker = item.get_closest_marker("shared_state")
@@ -84,6 +85,17 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
         return state != states[key].most_common(1)[0][0]
 
     items[:] = [i for i in items if rare(i)] + [i for i in items if not rare(i)]
+
+
+def _report_only_cases_to_qase(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """With the Qase reporter (qase-pytest) installed, only tests of a case (`@qase.id(…)`) report:
+    in testops mode a result without a case id makes Qase create a new case outside the suite —
+    tests/framework and any test without a case are marked `qase_ignore`."""
+    if not config.pluginmanager.has_plugin("qase_pytest"):
+        return
+    for item in items:
+        if item.get_closest_marker("qase_id") is None:
+            item.add_marker(pytest.mark.qase_ignore())
 
 
 # --- settings, logs

@@ -168,7 +168,8 @@ junit.xml` for CI and the TMS.
 - Test code mirrors the TMS tree: top-level suite → package, leaf suite → `test_<leaf>.py`, case →
   `def test_<id>_<title>` — **TestRail** `test_C123_…` (trcli `parse_junit --case-matcher name`
   reads it from junit.xml), **Qase** read-only `test_LS83_add_new_diagnosis` (+ the id in the
-  docstring), a writable Qase: its pytest reporter. A test without a case has no id; never invent
+  docstring), a writable Qase: its pytest reporter (qase-pytest; the plugin marks every test without
+  `@qase.id` `qase_ignore`, so a result never creates a case outside the suite). A test without a case has no id; never invent
   one.
 - **Soft assertions — `pytest-check`**: one `with check: assert …, "what"` per expectation, so a
   run reports every broken one of the case; a plain `assert` only where going on is pointless (a
